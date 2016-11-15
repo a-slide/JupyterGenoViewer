@@ -29,6 +29,7 @@ import pandas as pd
 
 # Local lib import
 from JGV_helper_fun import *
+from JGV_helper_fun import jprint as print
 
 #~~~~~~~CLASS~~~~~~~#
 
@@ -42,7 +43,7 @@ class Alignment(object):
              A standard bam file already SORTED BY COORDINATES (http://samtools.sourceforge.net/SAM1.pdf) containing aligned reads.
              Ideally the file would also be already indexed with samtools index. If not the program will index the file (can take time)
         *  name
-            Name of the data file that will be used as track name for plotting.
+            Name of the data file that will be used as track name for plotting. If not given, will be deduced from fp file name
         * verbose
             If True, will print more information during initialisation and calls of all the object methods.
         """
@@ -70,8 +71,13 @@ class Alignment(object):
         
          # The index should be available at this stage
         with pysam.AlignmentFile(fp) as bam:
-            assert bam.has_index(), "Bam file is not indexed ?"       
-        
+            assert bam.has_index(), "Bam file is not indexed ?"
+            
+            # save the list of the sequences found in the file
+            self.seqid_list = bam.references
+            self.n_seq = len(self.seqid_list)
+
+
         # Save the file path list
         self.fp = fp
             
@@ -85,32 +91,30 @@ class Alignment(object):
             msg+="\t{}\t{}\n".format(k, v)
         return (msg)
         
-
-    #~~~~~~~PRIVATE METHODS~~~~~~~#
-    
-    def _len_seqid (self, seqid):
-        """ Calculate the length of a seqid reference from the index metadata """
-        with pysam.AlignmentFile(self.fp, "rb") as bam:
-            for reference, length in zip(bam.references, bam.lengths):
-                if seqid == reference:
-                    return length
-        return 0
-    
+    def __repr__ (self):
+        return ("{}-{}".format(self.__class__.__name__, self.name))
+        
+        
     #~~~~~~~PUBLIC METHODS~~~~~~~#
     
-    def seqid_read_density (self):
+    def seqid_read_count (self):
         """
         Return a dataframe containing 3 colums ("length", "read_count", "read_density") for all seq_id reference sequence in the BAM file.
         The read count is computationally intensive and can take time for large BAM files
-        """
-        df = pd.DataFrame(columns=["length", "read_count", "read_density"])
-        
+        """       
         with pysam.AlignmentFile(self.fp, "rb") as bam:
+            df = pd.DataFrame(columns=["length", "read_count", "rpkm"], index=bam.references)
+            total_read = 0
             for seqid, length in zip(bam.references, bam.lengths):
                 read_count = bam.count(seqid)
-                df.at[seqid] = [length, read_count, read_count/length]
+                df.loc[seqid]["length"] = length
+                df.loc[seqid]["read_count"] = read_count
+                total_read += read_count
+            
+        for seqid, val in df.iterrows():
+            df.loc[seqid]["rpkm"] = val.read_count / (val.length/1000) / (total_read/1000000)
         
-        return df.sort_values(by="length", ascending=False)
+        return df
 
     def interval_coverage (self, seqid, start=None, end=None, n_step=500, mode="auto"):
         """

@@ -30,6 +30,7 @@ import pandas as pd
 
 # Local lib import
 from JGV_helper_fun import *
+from JGV_helper_fun import jprint as print
 
 #~~~~~~~CLASS~~~~~~~#
 
@@ -45,13 +46,14 @@ class Annotation(object):
             format. Ideally the  file would be already indexed with tabix bgzip. If not the program will sort the features and index the 
             file (can take time)
         *  name
-            Name of the data file that will be used as track name for plotting.
+            Name of the data file that will be used as track name for plotting. If not given, will be deduced from fp file name
         * verbose
             If True, will print more information during initialisation and calls of all the object methods.
         """
         #Save self variable
-        self.name= name if name else file_basename(fp)
+        self.name = name if name else file_basename(fp)
         self.verbose=verbose
+        self.counted = False
         
         # Verify that the file is readable
         if not access(fp, R_OK):
@@ -65,7 +67,7 @@ class Annotation(object):
             self.format = "gff3"
             self.get_ID = self._get_gff3_ID
         else:
-            raise ValueError ("The file is not in gtf or gff3 format (.gff3.gz, .gff3, .gtf.gz, .gtf). Please provide a correctly formated file")
+            raise ValueError ("The file is not in gtf/gff3 format (.gff3/.gtg/+-.gz). Please provide a correctly formated file")
         
         # Save the file path list
         self.fp = fp
@@ -91,7 +93,12 @@ class Annotation(object):
             # Compress and index the sorted file with tabix
             if self.verbose: print("\tCompress and index with tabix")
             self.fp = pysam.tabix_index(temp_file, preset="gff", force=True)
-            
+        
+        with pysam.TabixFile(self.fp, parser=pysam.asGTF()) as tbf:
+            self.seqid_list = [i.decode() for i in tbf.contigs]
+            self.n_seq = len(self.seqid_list)
+        
+        
     def __str__(self):
         """readable description of the object"""
         msg = "{} instance\n".format(self.__class__.__name__) 
@@ -101,35 +108,63 @@ class Annotation(object):
         for k,v in sorted_d.items():
             msg+="\t{}\t{}\n".format(k, v)
         return (msg)
+
+    def __repr__ (self):
+        return ("{}_{}_{} seq".format(self.__class__.__name__, self.name, self.n_seq))
         
     #~~~~~~~PROPERTY METHODS~~~~~~~#
         
     @property
     def seqid_count(self):
         """List of all the sequence ids found in the annotation file"""
-        with pysam.TabixFile(self.fp, parser=pysam.asGTF()) as tbf:
-            c = Counter()
-            for line in tbf.fetch():
-                c[line.contig]+=1
-        df = pd.DataFrame.from_dict(c, orient='index', dtype=int)
-        df.columns = ['count']
-        df.sort_values(by="count", inplace=True, ascending=False)
-        return df
+        if not self.counted: self._count()
+        return self._seqid_count
 
     @property
     def feature_type_count(self):
-        """List of all the feature types found in the annotation file"""
-        with pysam.TabixFile(self.fp, parser=pysam.asGTF()) as tbf:
-            c = Counter()
-            for line in tbf.fetch():
-                c[line.feature]+=1
-        df = pd.DataFrame.from_dict(c, orient='index', dtype=int)
-        df.columns = ['count']
-        df.sort_values(by="count", inplace=True, ascending=False)
-        return df
-    
+        """List of all the sequence ids found in the annotation file"""
+        if not self.counted: self._count()
+        return self._feature_type_count
+        
+    @property
+    def all_feature_count(self):
+        """List of all the sequence ids found in the annotation file"""
+        if not self.counted: self._count()
+        return self._all_feature_count
+        
+        
     #~~~~~~~PRIVATE METHODS~~~~~~~#
-    
+
+    def _count(self):
+        """Count all features, seqid, and feature type in the annotation file in one pass"""
+        # Counters
+        seqid_count = Counter()
+        feature_type_count = Counter()
+        all_feature_count = 0
+        
+        # Iterate throught file and count
+        with pysam.TabixFile(self.fp, parser=pysam.asGTF()) as tbf:            
+            for line in tbf.fetch():
+                seqid_count[line.contig]+=1
+                feature_type_count[line.feature]+=1
+                all_feature_count+=1
+        
+        # Convert Seqid_table in dataframe
+        self._seqid_count = pd.DataFrame.from_dict(seqid_count, orient='index', dtype=int)
+        self._seqid_count.columns = ['count']
+        self._seqid_count.sort_values(by="count", inplace=True, ascending=False)
+        
+        # Convert Seqid_table in dataframe
+        self._feature_type_count = pd.DataFrame.from_dict(feature_type_count, orient='index', dtype=int)
+        self._feature_type_count.columns = ['count']
+        self._feature_type_count.sort_values(by="count", inplace=True, ascending=False)
+        
+        # Store the all feature counter
+        self._all_feature_count = all_feature_count
+        
+        # Set the flag to True so we don't have to do it again
+        self.counted = True
+            
     def _get_gtf_ID (self, line):
         """
         Parse a gtf line and extract the feature ID corresponding to the feature type of the line, if possible.
