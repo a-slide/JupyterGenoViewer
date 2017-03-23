@@ -102,7 +102,7 @@ class Level (object):
         * end
             End coordinate of the feature to fit in a level, on the positive strand
         * strand
-            Strand of the feature. Can be + - or None
+            Strand of the feature. Can be + - or . if unknown
         """
         self.count["all_features"] +=1
 
