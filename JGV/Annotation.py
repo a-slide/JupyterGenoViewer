@@ -20,12 +20,10 @@
 """
 
 # Strandard library imports
-from collections import OrderedDict, namedtuple, Counter
+from collections import OrderedDict
 from os import access, R_OK
-import csv
 
 # Third party import
-import pysam
 import pandas as pd
 
 # Local lib import
@@ -35,214 +33,202 @@ from JGV_helper_fun import jprint as print
 #~~~~~~~CLASS~~~~~~~#
 
 class Annotation(object):
+    """
+    Parse data from a file containing genomic annotation in GFF3, GTF or BED format.
+    Can return the list of annotations for a given interval
+    """
 
     #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
 
-    def __init__ (self, fp, name=None, verbose=False):
+    def __init__ (self, fp, name=None, verbose=False, ref_list=[]):
         """
          * fp
-            A standard gff3 file (http://www.ensembl.org/info/website/upload/gff3.html) or gtf
-            (http://www.ensembl.org/info/website/upload/gff.html)containing features annotations. Could be uncompressed
-            or archived in gz format. Ideally the file would be already indexed with tabix bgzip. If not the program
-            will sort the features and index the file (can take time)
+            An URL to a standard genomic file containing features annotations among the following format:
+              gff3: http://www.ensembl.org/info/website/upload/gff3.html
+              gtf:  http://www.ensembl.org/info/website/upload/gff.html
+              bed:  http://www.ensembl.org/info/website/upload/bed.html
+            Valid URL schemes include http, ftp, s3, and file.
+            The file can eventually be compressed in ‘gzip’, ‘bz2’, ‘zip’ or ‘xz’
         *  name
             Name of the data file that will be used as track name for plotting. If not given, will be deduced from fp
-            file name
+            file name  [ DEFAULT: None ]
         * verbose
-            If True, will print more information during initialisation and calls of all the object methods.
+            If True, will print more information during initialisation and calls of all the object methods
+            [ DEFAULT: False ]
+        * ref_list
+            list of reference sequence id to select from the data file, by default all [ DEFAULT: [] ]
         """
-        #Save self variable
-        self.name = name if name else file_basename(fp)
-        self.verbose=verbose
-        self.counted = False
 
         # Verify that the file is readable
-        if not access(fp, R_OK):
-            raise IOError ("{} is not readable".format(fp))
+        assert access(fp, R_OK), "{} is not readable".format(fp)
 
-        # Define file format and attributes field parser
-        if extensions(fp)[0] == "gtf":
-            self.format = "gtf"
-            self.get_ID = self._get_gtf_ID
-        elif extensions(fp)[0] == "gff3":
-            self.format = "gff3"
-            self.get_ID = self._get_gff3_ID
-        else:
-            raise ValueError ("The file is not in gtf/gff3 format (.gff3/.gtg/+-.gz). \
-            Please provide a correctly formated file")
-
-        # Save the file path list
+        #Save self variable
         self.fp = fp
+        self.name = name if name else file_basename(fp)
+        self.verbose = verbose
+        self.ext = extensions(fp)[0]
 
-        # If not indexed, sort and compress and index the original file with tabix
-        if not access(fp+".tbi", R_OK):
+        if self.ext == "gtf":
+            if self.verbose: print("Use GTF parser to parse annotations in", self.name)
+            self.df = self._gtf_parser(fp, ref_list)
+        elif self.ext == "gff3":
+            if self.verbose: print("Use GFF3 parser to parse annotations in ", self.name)
+            self.df = self._gff3_parser(fp, ref_list)
+        elif self.ext == "bed":
+            if self.verbose: print("Use BED parser to parse annotations in ", self.name)
+            self.df = self._bed_parser(fp, ref_list)
+        else:
+            msg = "The file is not in gtf/gff3/bed format (.gff3/.gtg/.bed +-.gz). Please provide a correctly formated file"
+            raise ValueError(msg)
 
-            # Import in a panda dataframe, remove empty rows, and convert coordinates in integer
-            if self.verbose:  print("Indexing file with tabix\n\tImport annotation file and clean data")
-            col_names = ["seqname","source","feature","start","stop","score","strand","frame","attribute"]
-            df = pd.read_csv(fp, names=col_names, sep="\t")
-            df.dropna(inplace=True)
-            df[['start', 'stop']] = df[['start', 'stop']].astype(int)
+        # Sort the dataframe
+        if self.verbose: print("Sort annotation features by coordinates".format(self.ext))
+        self.df.sort_values(by=["refid","start","end"], inplace=True)
 
-            # Sort the dataframe
-            if self.verbose: print("\tSort lines by coordinates")
-            df.sort_values(by=["seqname","start","stop"], inplace=True)
-
-            # Remove the extension, name the output file and write in file
-            if self.verbose: print("\tWrite a new sorted annotation file")
-            temp_file = "{}/{}_sorted.{}".format(dir_path(fp), file_basename(fp),extensions(fp)[0])
-            df.to_csv(temp_file, sep="\t", header=False, index=False, quoting=csv.QUOTE_NONE)
-
-            # Compress and index the sorted file with tabix
-            if self.verbose: print("\tCompress and index with tabix")
-            self.fp = pysam.tabix_index(temp_file, preset="gff", force=True)
-
-        with pysam.TabixFile(self.fp, parser=pysam.asGTF()) as tbf:
-            self.seqid_list = [i.decode() for i in tbf.contigs]
-            self.n_seq = len(self.seqid_list)
-
+        # Verbose informations
+        if self.verbose:
+            print("Annotation features count:{}".format(self.feature_count))
+            print("refid count:{}".format(self.refid_count))
+            print("Feature type count:{}".format(self.type_count))
 
     def __str__(self):
         """readable description of the object"""
         msg = "{} instance\n".format(self.__class__.__name__)
         # list all values in object dict in alphabetical order
         for k,v in OrderedDict(sorted(self.__dict__.items(), key=lambda t: t[0])).items():
-            msg+="\t{}\t{}\n".format(k, v)
+            if k != "df":
+                msg+="\t{}\t{}\n".format(k, v)
         return (msg)
 
-
     def __repr__ (self):
-        return ("{}_{}_{} seq".format(self.__class__.__name__, self.name, self.n_seq))
+        return ("{} {} {} features".format(self.__class__.__name__, self.name, self.feature_count))
 
     #~~~~~~~PROPERTY METHODS~~~~~~~#
 
     @property
-    def seqid_count(self):
-        """List of all the sequence ids found in the annotation file"""
-        if not self.counted: self._count()
-        return self._seqid_count
+    def feature_count(self):
+        """Number of features collected"""
+        return len(self.df)
 
     @property
-    def feature_type_count(self):
-        """List of all the sequence ids found in the annotation file"""
-        if not self.counted: self._count()
-        return self._feature_type_count
+    def refid_count(self):
+        """Number of unique reference sequence ids found"""
+        return self.df["refid"].nunique()
 
     @property
-    def all_feature_count(self):
-        """List of all the sequence ids found in the annotation file"""
-        if not self.counted: self._count()
-        return self._all_feature_count
+    def type_count(self):
+        """Number of unique feature type found"""
+        return self.df["type"].nunique()
 
+    @property
+    def refid_list(self):
+        """List of unique reference sequence ids found"""
+        return self.df["refid"].unique().tolist()
+
+    @property
+    def type_list(self):
+        """List of unique feature type found"""
+        return self.df["type"].unique().tolist()
+
+    @property
+    def refid_count_uniq(self):
+        """List of unique reference sequence ids with count of associated features"""
+        return pd.DataFrame(self.df.groupby("refid").size().sort_values(ascending=False), columns=["count"])
+
+    @property
+    def type_count_uniq(self):
+        """List of unique feature types with count of associated features"""
+        return pd.DataFrame(self.df.groupby("type").size().sort_values(ascending=False), columns=["count"])
 
     #~~~~~~~PRIVATE METHODS~~~~~~~#
 
-    def _count(self):
-        """Count all features, seqid, and feature type in the annotation file in one pass"""
-        # Counters
-        seqid_count = Counter()
-        feature_type_count = Counter()
-        all_feature_count = 0
+    def _bed_parser(self, fp, ref_list=[]):
+        """Parse a bed formated file"""
+        # Import the file in a dataframe
+        col_names = ["refid","start","end","ID","score","strand","thickStart","thickEnd","itemRgb","blockCount","blockSizes","blockStarts"]
+        df = pd.read_csv(fp, sep="\t", names=col_names, index_col=False, comment="#")
+        # Select only features from the reference list
+        if ref_list:
+            df = df[(df["refid"].isin(ref_list))]
+        # Cast the start and end field in integer
+        df[['start', 'end']] = df[['start', 'end']].astype(int)
+        # Extract the ID field = first field of attribute
+        df['type'] = "unknown"
+        # Drop unecessary fields and reorganise order
+        df = df[["refid","start","end","strand","ID", "type"]]
+        return df
 
-        # Iterate throught file and count
-        with pysam.TabixFile(self.fp, parser=pysam.asGTF()) as tbf:
-            for line in tbf.fetch():
-                seqid_count[line.contig]+=1
-                feature_type_count[line.feature]+=1
-                all_feature_count+=1
+    def _gff3_parser(self, fp, ref_list=[]):
+        """Parse a gff3 formated file"""
+        # Import the file in a dataframe
+        col_names = ["refid","source","type","start","end","score","strand","frame","attribute"]
+        df = pd.read_csv(fp, sep="\t", names=col_names, index_col=False, comment="#")
+        # Select only features from the reference list
+        if ref_list:
+            df = df[(df["refid"].isin(ref_list))]
+        # Cast the start and end field in integer
+        df[['start', 'end']] = df[['start', 'end']].astype(int)
+        # Extract the ID field = first field of attribute
+        df['ID'] = df["attribute"].str.split(';').str[0].str[3:]
+        # Drop unecessary fields and reorganise order
+        df = df[["refid","start","end","strand","ID","type"]]
+        return df
 
-        # Convert Seqid_table in dataframe
-        self._seqid_count = pd.DataFrame.from_dict(seqid_count, orient='index', dtype=int)
-        self._seqid_count.columns = ['count']
-        self._seqid_count.sort_values(by="count", inplace=True, ascending=False)
-
-        # Convert Seqid_table in dataframe
-        self._feature_type_count = pd.DataFrame.from_dict(feature_type_count, orient='index', dtype=int)
-        self._feature_type_count.columns = ['count']
-        self._feature_type_count.sort_values(by="count", inplace=True, ascending=False)
-
-        # Store the all feature counter
-        self._all_feature_count = all_feature_count
-
-        # Set the flag to True so we don't have to do it again
-        self.counted = True
-
-    def _get_gtf_ID (self, line):
-        """
-        Parse a gtf line and extract the feature ID corresponding to the feature type of the line, if possible.
-        If not found, then an empty string will be returned.
-        """
-        if line.feature == "exon":
-            id_field = "exon_id"
-        elif line.feature == "CDS":
-            id_field = "cdsid"
-        elif line.feature == "transcript":
-            id_field = "transcript_id"
-        elif line.feature == "gene":
-            id_field = "gene_id"
-        else:
-            return ""
-
-        for a in line.attributes.strip().split(";"):
-            if a:
-                l = a.strip().split(" ")
-                if len(l) == 2:
-                    if l[0] ==  id_field:
-                        return l[1][1:-1]
-        return ""
-
-    def _get_gff3_ID (self, line):
-        """
-        Parse a gff3 line and extract the feature ID.
-        If not found, then an empty string will be returned.
-        """
-        for a in line.attributes.strip().split(";"):
-            if a:
-                l = a.strip().split("=")
-                if len(l) == 2:
-                    if l[0] == "ID":
-                        return l[1]
-        return ""
+    def _gtf_parser(self, fp, ref_list=[]):
+        """Parse a gtf formated file"""
+        # Import the file in a dataframe
+        col_names = ["refid","source","type","start","end","score","strand","frame","attribute"]
+        df = pd.read_csv(fp, sep="\t", names=col_names, index_col=False, comment="#")
+        # Select only features from the reference list
+        if ref_list:
+            df = df[(df["refid"].isin(ref_list))]
+        # Cast the start and end field in integer
+        df[['start', 'end']] = df[['start', 'end']].astype(int)
+        # Extract the ID field = first field of attribute=
+        df['ID'] = df["attribute"].str.split('\"').str[1]
+        # Drop unecessary fields and reorganise order
+        df = df[["refid","start","end","strand","ID","type"]]
+        return df
 
     #~~~~~~~PUBLIC METHODS~~~~~~~#
 
-    def interval_features (self, seqid, start, end, feature_types=[]):
+    def interval_features (self, refid, start, end, feature_type=None):
         """
-        Parse the annotation file for the given seqid and interval and return a dataframe containing all the features
-        found for each original line in the gff or gtf file. Features are identified by their ID for gff3 file. For gtf
-        file the ID is parsed only for exon, cds, transcript or genes, if found.
-        * seqid
-            Name of the sequence from the initial fasta file to display
+        Parse the annotation file for the given refid and interval and return a dataframe containing all the features
+        found for each original line. Features are identified by their ID field for gff3 files, by the entire
+        attribute field for the bed files and by the first element in the attribute field for the gtf files
+        * refid
+            ID of the reference sequence to fetch
         * start
-            Start of the window to display. If not given will start from 0 [ DEFAULT: None ]
+            Start of the window to display.
         * end
-            End of the window to display. If not given will start from end of the sequence [ DEFAULT: None ]
+            End of the window to display.
         * feature_types
-            List of features types for which a track will be displayed if at least 1 feature of this type was found in
-            the requested interval ( "exon"|"transcript"|"gene"|"CDS"...). If not given, all features type found in the
-            interval will be displayed [ DEFAULT: [] ]
+            Name of a valid feature type ( "exon"|"transcript"|"gene"|"CDS"...) or list of names of feature type for
+            which a row will be returned. The option is not available for bed files. If not given, all features type
+            found in the interval will be returned [ DEFAULT: None ]
         """
-        # Init list to collect data and a custume named tuple to store the info
-        feature = namedtuple('feature', ["ID","start","end","strand","type"])
-        feature_list = []
+        # Verifications and auto adjustment of coordinates
+        if not refid in self.refid_list:
+            if self.verbose: print ("The reference {} is not in the list of references with alignment".format(refid))
+            return pd.DataFrame(columns=["refid","start","end","strand","ID","type"])
+        if feature_type and self.ext == "bed":
+            if self.verbose: print ("Incompatible options. Bed files do not allow to identify feature_type")
+            return pd.DataFrame(columns=["refid","start","end","strand","ID","type"])
 
-        # Verify that the sequence is in the seqid list
-        if seqid not in self.seqid_list:
-            if self.verbose:
-                print("Seqid ({}) not found in the list for the annotation {}".format(seqid, self.name))
-            return pd.DataFrame()
-
-        # Iterate over the indexed file containing the features
-        with pysam.TabixFile(self.fp, parser=pysam.asGTF()) as f:
-
-            for l in f.fetch(seqid, start, end, parser=pysam.asGTF()):
-                if not feature_types or l.feature in feature_types:
-                    feature_list.append(feature( self.get_ID (l), l.start, l.end, l.strand, l.feature))
-
-            df= pd.DataFrame(feature_list)
-
-            if self.verbose and not df.empty:
-                for k,v in df.groupby("type"):
-                    print ("{}: {}".format(k, len(v)))
-
+        # Select the refid and coordinates
+        df = self.df[(self.df["refid"] == refid)&(self.df["end"] > start)&(self.df["start"] < end)]
+        if df.empty:
+            if self.verbose: print("No feature found in the requested interval")
             return df
+
+        # Select feature types if required
+        if feature_type:
+            if type(feature_type) == list:
+                df = df[(df["type"].isin(feature_type))]
+            elif type(feature_type) == str:
+                df = df[(df["type"] == feature_type)]
+            if df.empty:
+                if self.verbose: print("No feature found within the requested feature types")
+
+        return df.copy().reset_index(drop=True)
