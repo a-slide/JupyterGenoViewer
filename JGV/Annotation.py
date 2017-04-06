@@ -82,14 +82,11 @@ class Annotation(object):
             raise ValueError(msg)
 
         # Sort the dataframe
-        if self.verbose: print("Sort annotation features by coordinates".format(self.ext))
+        if self.verbose: print("\tSort annotation features by coordinates".format(self.ext))
         self.df.sort_values(by=["refid","start","end"], inplace=True)
 
-        # Verbose informations
         if self.verbose:
-            print("Annotation features count:{}".format(self.feature_count))
-            print("refid count:{}".format(self.refid_count))
-            print("Feature type count:{}".format(self.type_count))
+            print ("\tFound {} features in {} reference sequences".format( self.feature_count, self.refid_count))
 
     def __str__(self):
         """readable description of the object"""
@@ -101,7 +98,7 @@ class Annotation(object):
         return (msg)
 
     def __repr__ (self):
-        return ("{} {} {} features".format(self.__class__.__name__, self.name, self.feature_count))
+        return ("{}-{} / Feature count {}".format(self.__class__.__name__, self.name, self.feature_count))
 
     #~~~~~~~PROPERTY METHODS~~~~~~~#
 

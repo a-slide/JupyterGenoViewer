@@ -59,8 +59,8 @@ class Reference(object):
         * ref_list
             list of reference sequence id to select from the data file, by default all [ DEFAULT: [] ]
         * output_index
-            If True will write a simple A 2 column index tsv file containing the Reference sequenc ids and their lengths
-            [ DEFAULT: False ]
+            If True will write a simple A 2 column index tsv file containing the Reference sequence ids and their
+            lengths [ DEFAULT: False ]
         """
         # Verify that the file is readable
         assert access(fp, R_OK), "{} is not readable".format(fp)
@@ -114,7 +114,8 @@ class Reference(object):
             self.d.name= "length"
             self.d.sort_values(inplace=True, ascending=False)
 
-        if self.verbose: print ("Found {} reference sequences".format(self.refid_count))
+        if self.verbose:
+            print ("\tFound {} reference sequences".format(self.refid_count))
 
     def __str__(self):
         """readable description of the object"""
@@ -129,7 +130,7 @@ class Reference(object):
         return (msg)
 
     def __repr__ (self):
-        return ("{}-{}".format(self.__class__.__name__, self.name))
+        return ("{}-{} / Refid count {}".format(self.__class__.__name__, self.name, self.refid_count))
 
     #~~~~~~~PROPERTY METHODS~~~~~~~#
 
@@ -140,7 +141,7 @@ class Reference(object):
 
     @property
     def refid_count(self):
-        """List of all the sequence ids found in the annotation file"""
+        """Number of unique reference sequence ids found"""
         return len(self.d)
 
     #~~~~~~~PUBLIC METHODS~~~~~~~#
