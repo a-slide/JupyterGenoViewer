@@ -351,7 +351,7 @@ class JGV(object):
             warnings.warn("No annotation and alignment track loaded")
             return None
 
-        # Auto define start and stop if not given
+        # Auto define start and stop and overlapping annotation offset if not given
         if not start:
             start = 0
             if self.verbose: print ("Autodefine start position: {}".format(start))
@@ -360,8 +360,12 @@ class JGV(object):
             if self.verbose: print ("Autodefine end position: {}".format(end))
         if start >= end:
             raise ValueError ("Invalid coordinates (start: {}, end :{}) start has to be greater than end")
+        if not annotation_offset:
+            annotation_offset = int((end-start)/400)
+            if self.verbose:print ("Estimated overlap offset: {}".format(annotation_offset))
 
         figheight = 0
+
         # Extract alignment coverage data
         alignments_dict = OrderedDict()
         if self.alignments:
@@ -379,7 +383,10 @@ class JGV(object):
             for a in self.annotations:
                 annotation_dict[a.name] = a.interval_features(
                     refid=refid, start=start, end=end, feature_type=annotation_feature_types)
-                figheight += annotation_dict[a.name].type.nunique()*annotation_track_height
+                n = annotation_dict[a.name].type.nunique()
+                # To take empty elenment into account
+                if n == 0: n = 1
+                figheight += n*annotation_track_height
             figheight+=1
 
         fig = pl.figure (figsize= (figwidth, figheight))
@@ -404,33 +411,62 @@ class JGV(object):
 
                 # plot the subplot if
                 if track_df["+"].sum() + track_df["-"].sum() == 0:
-                    ax.text(0.5, 0.5,'No coverage for this region',
-                    horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    ax.text(0.5, 0.5,'No coverage in this windows',
+                        horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
                 else:
                     track_df.plot.area(ax=ax, alpha=0.8)
 
             # Add x labels if last element
             ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
-            h+=1
 
         if self.annotations:
             for track_name, track_df in annotation_dict.items():
-                if self.verbose: print ("\tAlignment track name: {}".format(track_name))
-                for feature_type, feature_df in track_df.groupby("type"):
-                    if feature_df.empty:
-                        continue
-                    ax = pl.subplot(grid[h:h+annotation_track_height])
-                    h+=annotation_track_height
-                    ax.set_xlim((start, end))
-                    ax.yaxis.set_tick_params(left=False, right=False, labelleft=False, labelright=False)
-                    ax.xaxis.set_tick_params(bottom=False, top=False, labelbottom=False, labeltop=False)
-                    ax.ticklabel_format(useOffset=False, style='plain')
-                    ax.grid(axis="y", b=False)
-                    ax.set_ylabel(feature_type)
-
-                # Add x labels if last element of each annotation file
-                ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
                 h+=1
+                if self.verbose: print ("\tAlignment track name: {}".format(track_name))
+
+                # No feature exception
+                if track_df.empty:
+                    ax = pl.subplot(grid[h:h+annotation_track_height])
+                    ax.text(0.5, 0.5,'No feature found in this windows',
+                        horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    ax.yaxis.set_tick_params(left=False, right=False, labelleft=False, labelright=False)
+                    ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
+                    ax.set_title (track_name)
+
+                # General case
+                else:
+                    first=True
+                    for feature_type, feature_df in track_df.groupby("type"):
+                        ax = pl.subplot(grid[h:h+annotation_track_height])
+                        h+=annotation_track_height
+                        ax.set_xlim((start, end))
+                        ax.yaxis.set_tick_params(left=False, right=False, labelleft=False, labelright=False)
+                        ax.xaxis.set_tick_params(bottom=False, top=False, labelbottom=False, labeltop=False)
+                        ax.ticklabel_format(useOffset=False, style='plain')
+                        ax.grid(axis="y", b=False)
+                        ax.set_ylabel(feature_type)
+
+                        # Compute the level where to plot the patch, no
+                        level = Level( max_depth=annotation_max_depth, offset=annotation_offset,
+                            filter_pos=False, filter_neg=False, filter_unstrand=True)
+
+                        for n, feature in feature_df.iterrows():
+                            fl = level(feature.ID, feature.start, feature.end, feature.strand)
+                            if fl:
+                                ax.add_patch( Arrow( posA=[fl.start, fl.level], posB=[fl.end, fl.level], linewidth=3, color=annotation_color, arrowstyle=fl.arrowstyle))
+                                if annotation_label:
+                                    text_end = fl.end if fl.end < end-annotation_offset*20 else end-annotation_offset*20
+                                    text_start = fl.start if fl.start > start+annotation_offset*20 else start+annotation_offset*20
+                                    ax.text (x=text_start+ (text_end-text_start)/2, y=fl.level, s=fl.ID, horizontalalignment="center")
+
+                        ax.set_ylim(level.min_level-0.5, level.max_level+0.5)
+
+                        # First element exception
+                        if first:
+                            ax.set_title (track_name)
+                            first = False
+                    # Last elemet exception
+                    ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
 
         #return (alignments_dict, annotation_dict)
 
