@@ -30,23 +30,24 @@ class Level (object):
     Compute the level of a given feature on the Annotation track to avoid annotation overlaping
     """
     def __init__ (self,
-                  max_depth=10,
+                  max_depth=100,
                   offset=10,
                   filter_pos=False,
                   filter_neg=False,
-                  filter_unstrand=True):
+                  filter_unstrand=False):
         """
         Define general options for Level class
         * max_depth
-            Maximal total number of positive or negative levels.
+            Maximal total number of positive or negative levels. Safeguard value in case of highly
+            overlapped annotations [ DEFAULT: 100 ]
         * offset
-            Minimal distance between 2 contigous annotation features on the same level
+            Minimal distance between 2 contigous annotation features on the same level [ DEFAULT: 10 ]
         * filter_pos
             Filter-out annotation features on the positive strand [ DEFAULT: False ]
         * filter_neg
             Filter-out annotation features on the negative strand [ DEFAULT: False ]
         * filter_unstrand
-            Filter-out annotation features with no strand specified [ DEFAULT: True ]
+            Filter-out annotation features with no strand specified [ DEFAULT: False ]
         """
         # Save general parameter
         self.max_depth = max_depth
@@ -92,8 +93,8 @@ class Level (object):
 
     def __call__ (self, ID, start, end, strand):
         """
-        Compute the level of an annnotation feature based on the instance options and the other feautures previously
-        analysed, to avoid overlapping. Iterative call of the function has to be done with annotation features sorted
+        Compute the level of an annnotation feature based on the instance options and the other features previously
+        analysed to avoid overlapping. Iterative call of the function has to be done with annotation features sorted
         by start coordinates.
         * ID
             Name of the feature to fit in a level
@@ -112,7 +113,6 @@ class Level (object):
             self.count["positive_features"] +=1
 
             while level <= self.max_depth:
-
                 # If level is empty or if the level is free at this position
                 if level not in self.level_dict or (self.level_dict[level]+self.offset) < start:
                     self.level_dict[level] = end
@@ -125,7 +125,6 @@ class Level (object):
             self.count["negative_features"] +=1
 
             while level >= -self.max_depth:
-
                 # If level is empty or if the level is free at this position
                 if level not in self.level_dict or (self.level_dict[level]+self.offset) < start:
                     self.level_dict[level] = end

@@ -82,8 +82,8 @@ class Annotation(object):
             raise ValueError(msg)
 
         # Sort the dataframe
-        if self.verbose: print("\tSort annotation features by coordinates".format(self.ext))
-        self.df.sort_values(by=["refid","start","end"], inplace=True)
+        #if self.verbose: print("\tSort annotation features by coordinates".format(self.ext))
+        #self.df.sort_values(by=["refid","start","end"], inplace=True)
 
         if self.verbose:
             print ("\tFound {} features in {} reference sequences".format( self.feature_count, self.refid_count))
@@ -189,27 +189,32 @@ class Annotation(object):
 
     #~~~~~~~PUBLIC METHODS~~~~~~~#
 
-    def interval_features (self, refid, start, end, feature_type=None):
+    def interval_features (self, refid, start, end, feature_types=None, max_features_per_type=None):
         """
         Parse the annotation file for the given refid and interval and return a dataframe containing all the features
         found for each original line. Features are identified by their ID field for gff3 files, by the entire
         attribute field for the bed files and by the first element in the attribute field for the gtf files
         * refid
-            ID of the reference sequence to fetch
+            Name of the sequence from the original fasta file to display
         * start
-            Start of the window to display.
+            Start of the window to display. The coordinate is not verified, if outside of the range it will
+            return an empty dataframe
         * end
-            End of the window to display.
+            End of the window to display. The coordinate is not verified, if outside of the range it will
+            return an empty dataframe
         * feature_types
             Name of a valid feature type ( "exon"|"transcript"|"gene"|"CDS"...) or list of names of feature type for
             which a row will be returned. The option is not available for bed files. If not given, all features type
             found in the interval will be returned [ DEFAULT: None ]
+        * max_features_per_type
+            Maximal total number of features for a particular feature type. If more are found, a random sampling will
+            be performed. If None, all the features will be returned [ DEFAULT: None ]
         """
         # Verifications and auto adjustment of coordinates
         if not refid in self.refid_list:
             if self.verbose: print ("The reference {} is not in the list of references with alignment".format(refid))
             return pd.DataFrame(columns=["refid","start","end","strand","ID","type"])
-        if feature_type and self.ext == "bed":
+        if feature_types and self.ext == "bed":
             if self.verbose: print ("Incompatible options. Bed files do not allow to identify feature_type")
             return pd.DataFrame(columns=["refid","start","end","strand","ID","type"])
 
@@ -217,15 +222,30 @@ class Annotation(object):
         df = self.df[(self.df["refid"] == refid)&(self.df["end"] > start)&(self.df["start"] < end)]
         if df.empty:
             if self.verbose: print("No feature found in the requested interval")
-            return df
+            return pd.DataFrame(columns=["refid","start","end","strand","ID","type"])
 
-        # Select feature types if required
-        if feature_type:
-            if type(feature_type) == list:
-                df = df[(df["type"].isin(feature_type))]
-            elif type(feature_type) == str:
-                df = df[(df["type"] == feature_type)]
-            if df.empty:
-                if self.verbose: print("No feature found within the requested feature types")
+        # Cast str to list
+        if type(feature_types) == str: feature_types = [feature_types]
 
+        # Filter_df by type and max number per type
+        select_list = []
+        for type_name, type_df in df.groupby("type"):
+            # Filter out if not in the list
+            if not feature_types or type_name in feature_types:
+                sdf = df[(df["type"] == type_name)]
+                if sdf.empty:
+                    if self.verbose: print("No feature of type {} found in the requested interval".format(type_name))
+                elif max_features_per_type and len(sdf)>max_features_per_type:
+                    select_list.append(sdf.sample(max_features_per_type))
+                else:
+                    select_list.append(sdf)
+        # Merge the selected features in a single df
+        if select_list:
+            df = pd.concat(select_list)
+        else:
+            if self.verbose: print("No feature found in the requested interval")
+            return pd.DataFrame(columns=["refid","start","end","strand","ID","type"])
+
+        # Return a sorted copy of the  df
+        df.sort_values(by=["refid","start","end"], inplace=True)
         return df.copy().reset_index(drop=True)

@@ -295,53 +295,60 @@ class JGV(object):
         start=None,
         end=None,
         plot_style="ggplot",
-        figwidth = 20,
+        figwidth = 30,
         alignment_track_height=5,
         annotation_track_height=2,
         alignment_bins = 500,
         alignment_bin_repr_fun = "max",
-        alignment_yscale="linear",
+        alignment_log=True,
         alignment_color="cadetblue",
-        annotation_feature_types=[],
+        feature_types=[],
+        max_features_per_type=500,
         annotation_offset=None,
-        annotation_max_depth= 10,
         annotation_label=False,
         annotation_color="cadetblue",
         **kwargs):
         """
-        refid,
+        * refid
+            Name of the sequence from the original fasta file to display
         * start
-            [DEFAULT : None ]
+            Start of the window to display. If not given, will be set to 0 [ DEFAULT: None ]
         * end
-            [DEFAULT : None ]
-        * plot_style
-            [DEFAULT : "ggplot" ]
+            End of the window to display. If not given, will be set to the length of refid [ DEFAULT: None ]
+        * plot_style [ DEFAULT: True ]
+            Default plot style for pyplot ('grayscale'|'bmh'|'ggplot'|'dark_background'|'classic'|'fivethirtyeight'...)
+            [ DEFAULT: "ggplot" ]
         * figwidth
              Width of the ploting area in inches [ DEFAULT: 20 ]
-        * alignment_bins
-            [DEFAULT : 500 ]
-        * alignment_bin_repr_fun
-            [DEFAULT : "max" ]
         * alignment_track_height
-            [DEFAULT : 5 ]
-        * alignment_yscale
-            [DEFAULT : "linear" ]
-        * alignment_color
-            [DEFAULT : "cadetblue" ]
-        * annotation_feature_types
-            [DEFAULT : [] ]
+            Height of individual aligment tracks [DEFAULT : 5 ]
         * annotation_track_height
-            [DEFAULT : 2 ]
+            Height of individual annotation tracks for each feature types [DEFAULT : 2 ]
+        * alignment_bins
+            Number of alignment count bins to divide the displayed window. Low number will result in low resolution
+            high value could result in a long ploting time. The value is automatically adjusted if lower than base
+            resolution, ie if the requested interval is lower than the number of bins [ DEFAULT: 500 ]
+        * alignment_bin_repr_fun
+            Function to represent each bin ("max", "mean" and "sum") [ DEFAULT: "max" ]
+        * alignment_log
+            if True the yscale will be log10 else it will be linear [ DEFAULT: True ]
+        * alignment_color
+            collection of 2 color names for the alignment + and - tracks [DEFAULT : ("cadetblue") ] #######################################
+        * feature_types
+            Name of a valid feature type ( "exon"|"transcript"|"gene"|"CDS"...) or list of names of feature type for
+            which a row will be returned. The option is not available for bed files. If not given, all features type
+            found in the interval will be returned [ DEFAULT: None ]
+        * max_features_per_type
+            Maximal total number of features for a particular feature type. If more are found, a random sampling will
+            be performed. If None, all the features will be returned [ DEFAULT: 500 ]
         * annotation_offset
-            [DEFAULT : None ]
-        * annotation_max_depth
-            [DEFAULT : 10 ]
+            Minimal distance between 2 contigous annotation features on the same level. If not given, will be
+            automatically set to 1/400 of the windows to display [DEFAULT : None ]
         * annotation_label
-            [DEFAULT : False ],
+            If True, labels of features will be plotted. To be avoid when expecting many features [DEFAULT : False ]
         * annotation_color
-            [DEFAULT : "cadetblue" ],
+            [DEFAULT : "cadetblue" ], #######################################
         * kwargs
-
         """
         # Verify that the sequence is in the refid list and that at least one alignment or annotation file was loaded
         if refid not in self.reference.refid_list:
@@ -366,29 +373,32 @@ class JGV(object):
 
         figheight = 0
 
-        # Extract alignment coverage data
+        # Extract alignment coverage data and compute the coverage tracks height
         alignments_dict = OrderedDict()
         if self.alignments:
             if self.verbose: print ("Extract alignment data", bold=True)
             for a in self.alignments:
                 alignments_dict[a.name] = a.interval_coverage(
                     refid=refid, start=start, end=end, bins=alignment_bins, bin_repr_fun=alignment_bin_repr_fun)
+                # +1 for space barwtween tracks
                 figheight += alignment_track_height+1
 
-        # Extract feature annotation data
+        # Extract feature annotation data and compute the feature tracks height
         annot_tracks_heigth = 0
         annotation_dict = OrderedDict()
         if self.annotations:
             if self.verbose: print ("Extract annotation data", bold=True)
             for a in self.annotations:
                 annotation_dict[a.name] = a.interval_features(
-                    refid=refid, start=start, end=end, feature_type=annotation_feature_types)
-                n = annotation_dict[a.name].type.nunique()
-                # To take empty elenment into account
-                if n == 0: n = 1
+                    refid=refid, start=start, end=end, feature_types=feature_types,
+                    max_features_per_type=max_features_per_type)
+                # Take empty df into account for ploting
+                n = 1 if annotation_dict[a.name].empty else annotation_dict[a.name].type.nunique()
                 figheight += n*annotation_track_height
+            # +1 for space barwtween tracks
             figheight+=1
 
+        # Create a pylot figure object with an empty grid
         fig = pl.figure (figsize= (figwidth, figheight))
         grid = GridSpec (nrows=figheight, ncols=1, hspace=0.1)
         pl.style.use (plot_style)
@@ -407,7 +417,7 @@ class JGV(object):
                 ax.xaxis.set_tick_params(bottom=False, top=False, labelbottom=False, labeltop=False)
                 ax.ticklabel_format(useOffset=False, style='plain')
                 ax.set_ylabel(track_name)
-                ax.set_yscale(alignment_yscale)
+                if alignment_log: ax.set_yscale("log")
 
                 # plot the subplot if
                 if track_df["+"].sum() + track_df["-"].sum() == 0:
@@ -424,7 +434,7 @@ class JGV(object):
                 h+=1
                 if self.verbose: print ("\tAlignment track name: {}".format(track_name))
 
-                # No feature exception
+                # No feature case
                 if track_df.empty:
                     ax = pl.subplot(grid[h:h+annotation_track_height])
                     ax.text(0.5, 0.5,'No feature found in this windows',
@@ -432,11 +442,14 @@ class JGV(object):
                     ax.yaxis.set_tick_params(left=False, right=False, labelleft=False, labelright=False)
                     ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
                     ax.set_title (track_name)
+                    h+=annotation_track_height
 
                 # General case
                 else:
                     first=True
                     for feature_type, feature_df in track_df.groupby("type"):
+
+                        # Prepare the ploting area
                         ax = pl.subplot(grid[h:h+annotation_track_height])
                         h+=annotation_track_height
                         ax.set_xlim((start, end))
@@ -446,17 +459,16 @@ class JGV(object):
                         ax.grid(axis="y", b=False)
                         ax.set_ylabel(feature_type)
 
-                        # Compute the level where to plot the patch, no
-                        level = Level( max_depth=annotation_max_depth, offset=annotation_offset,
-                            filter_pos=False, filter_neg=False, filter_unstrand=True)
+                        # Compute the non overlaping level where to plot the arrow
+                        level = Level(offset=annotation_offset)
 
                         for n, feature in feature_df.iterrows():
                             fl = level(feature.ID, feature.start, feature.end, feature.strand)
                             if fl:
                                 ax.add_patch( Arrow( posA=[fl.start, fl.level], posB=[fl.end, fl.level], linewidth=3, color=annotation_color, arrowstyle=fl.arrowstyle))
                                 if annotation_label:
-                                    text_end = fl.end if fl.end < end-annotation_offset*20 else end-annotation_offset*20
-                                    text_start = fl.start if fl.start > start+annotation_offset*20 else start+annotation_offset*20
+                                    text_end = fl.end if fl.end < end-annotation_offset else end-annotation_offset
+                                    text_start = fl.start if fl.start > start+annotation_offset else start+annotation_offset
                                     ax.text (x=text_start+ (text_end-text_start)/2, y=fl.level, s=fl.ID, horizontalalignment="center")
 
                         ax.set_ylim(level.min_level-0.5, level.max_level+0.5)
@@ -469,96 +481,3 @@ class JGV(object):
                     ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
 
         #return (alignments_dict, annotation_dict)
-
-        """
-        # Prepare the multipanel figure for plotting
-        fig = pl.figure (figsize= (figwidth, figheight))
-        grid = GridSpec (nrows=figheight, ncols=1, hspace=0.1)
-        pl.style.use (plot_style)
-
-        # Curent height marker
-        h = 0
-
-        # Plot the coverage graph
-        if self.verbose: print ("Plot alignment tracks", bold=True, size=100)
-        for alignment in self.alignments:
-            if self.verbose: print ("\tTrack name: {}".format(alignment.name))
-
-            # Extract data from the alignment file
-            df = alignment.interval_coverage (refid, start=start, end=end, n_step=alignment_n_step, mode=alignment_mode)
-            ax = pl.subplot(grid[h:h+alignment_track_height])
-            h+=alignment_track_height
-
-            # Tweak the subplot
-            ax.set_xlim((start, end))
-            ax.yaxis.set_tick_params(left=False, right=False, labelleft=False, labelright=False)
-            ax.xaxis.set_tick_params(bottom=False, top=False, labelbottom=False, labeltop=False)
-            ax.ticklabel_format(useOffset=False, style='plain')
-            ax.set_ylabel(alignment.name)
-            ax.set_yscale(alignment_yscale)
-
-            # Plot the area if coverage found in the region
-            if df.Coverage.any() > 0:
-                ax.fill_between(df.Position, 0, df.Coverage, color=alignment_color)
-            else:
-                ax.text(0.5, 0.5,'No coverage for this region', horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
-
-        # Add x labels if last element
-        ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
-
-        # Plot the feature graph
-        if self.verbose: print ("Plot annotation tracks", bold=True, size=100)
-
-        # Calculate overlap_offset if not given
-        if not annotation_offset:
-            annotation_offset = int((end-start)/400)
-            if self.verbose:print ("Estimated overlap offset: {}".format(annotation_offset))
-
-        for annotation in self.annotations:
-            if self.verbose: print ("\tTrack name: {}".format(annotation.name))
-
-            # Extract data from the annotation file
-            df = annotation.interval_features (refid, start=start, end=end, feature_types=annotation_feature_types)
-            if df.empty:
-                continue
-
-            # Add space and plot title on the top
-            h+=1
-            first =True
-            for feature_type, feature_df in df.groupby("type"):
-
-                # Define the plot area
-                ax = pl.subplot(grid[h:h+annotation_track_height])
-                h+=annotation_track_height
-                ax.set_xlim((start, end))
-                ax.yaxis.set_tick_params(left=False, right=False, labelleft=False, labelright=False)
-                ax.xaxis.set_tick_params(bottom=False, top=False, labelbottom=False, labeltop=False)
-                ax.ticklabel_format(useOffset=False, style='plain')
-                ax.grid(axis="y", b=False)
-                ax.set_ylabel(feature_type)
-                if first:
-                    ax.set_title (annotation.name)
-                    first = False
-
-                # Compute the level where to plot the patch, no
-                level = Level(
-                    max_depth=annotation_max_depth,
-                      offset=annotation_offset,
-                      filter_pos=False,
-                      filter_neg=False,
-                      filter_unstrand=True)
-
-                for n, feature in feature_df.iterrows():
-                    fl = level(feature.ID, feature.start, feature.end, feature.strand)
-                    if fl:
-                        ax.add_patch( Arrow( posA=[fl.start, fl.level], posB=[fl.end, fl.level], linewidth=3, color=annotation_color, arrowstyle=fl.arrowstyle))
-                        if annotation_label:
-                            text_end = fl.end if fl.end < end-annotation_offset*20 else end-annotation_offset*20
-                            text_start = fl.start if fl.start > start+annotation_offset*20 else start+annotation_offset*20
-                            ax.text (x=text_start+ (text_end-text_start)/2, y=fl.level, s=fl.ID, horizontalalignment="center")
-
-                ax.set_ylim(level.min_level-0.5, level.max_level+0.5)
-
-            # Add x labels if last element of each annotation file
-            ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
-            """

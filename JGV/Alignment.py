@@ -236,7 +236,7 @@ class Alignment(object):
             return empty bins
        * bins
             Number of alignment count bins to divide the displayed window. Low number will result in low resolution
-            high value could result in a long ploting time. The valur is automatically adjust is lower than base
+            high value could result in a long ploting time. The value is automatically adjusted if lower than base
             resolution, ie if the requested interval is lower than the number of bins [ DEFAULT: 500 ]
         * bin_repr_fun
             Function to represent each bin ("max", "mean" and "sum") [ DEFAULT: "max" ]
