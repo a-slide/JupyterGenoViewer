@@ -301,12 +301,14 @@ class JGV(object):
         alignment_bins = 500,
         alignment_bin_repr_fun = "max",
         alignment_log=True,
-        alignment_color="cadetblue",
+        alignment_color=("dodgerblue", "darkorange"),
+        alignment_alpha=0.5,
         feature_types=[],
         max_features_per_type=500,
         annotation_offset=None,
         annotation_label=False,
-        annotation_color="cadetblue",
+        annotation_color="grey",
+        annotation_alpha=0.5,
         **kwargs):
         """
         * refid
@@ -333,7 +335,7 @@ class JGV(object):
         * alignment_log
             if True the yscale will be log10 else it will be linear [ DEFAULT: True ]
         * alignment_color
-            collection of 2 color names for the alignment + and - tracks [DEFAULT : ("cadetblue") ] #######################################
+            collection of 2 color names for the alignment + and - tracks [DEFAULT : ("dodgerblue", "darkorange") ] #######################################
         * feature_types
             Name of a valid feature type ( "exon"|"transcript"|"gene"|"CDS"...) or list of names of feature type for
             which a row will be returned. The option is not available for bed files. If not given, all features type
@@ -400,7 +402,7 @@ class JGV(object):
 
         # Create a pylot figure object with an empty grid
         fig = pl.figure (figsize= (figwidth, figheight))
-        grid = GridSpec (nrows=figheight, ncols=1, hspace=0.1)
+        grid = GridSpec (nrows=figheight, ncols=1, hspace=0.5)
         pl.style.use (plot_style)
 
         # Curent height marker
@@ -413,18 +415,25 @@ class JGV(object):
                 ax = pl.subplot(grid[h:h+alignment_track_height])
                 h+=alignment_track_height
                 ax.set_xlim((start, end))
-                ax.yaxis.set_tick_params(left=False, right=False, labelleft=False, labelright=False)
-                ax.xaxis.set_tick_params(bottom=False, top=False, labelbottom=False, labeltop=False)
                 ax.ticklabel_format(useOffset=False, style='plain')
-                ax.set_ylabel(track_name)
                 if alignment_log: ax.set_yscale("log")
+                ax.yaxis.set_tick_params(left=True, right=False, labelleft=True, labelright=False)
+                ax.xaxis.set_tick_params(bottom=False, top=False, labelbottom=False, labeltop=False)
+                ax.set_ylabel(track_name)
 
-                # plot the subplot if
-                if track_df["+"].sum() + track_df["-"].sum() == 0:
-                    ax.text(0.5, 0.5,'No coverage in this windows',
-                        horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                # Plot the positive strand
+                if track_df["+"].sum () == 0:
+                    ax.text(0.5, 0.6,'No Coverage on the + strand', ha='center', va='center', transform=ax.transAxes)
                 else:
-                    track_df.plot.area(ax=ax, alpha=0.8)
+                    ax.fill_between(x=track_df.index, y1=0, y2=list(track_df["+"]),
+                        alpha=alignment_alpha, color=alignment_color[0], label="Positive strand")
+                # Plot the negative strand
+                if track_df["-"].sum () == 0:
+                    ax.text(0.5, 0.4,'No Coverage on the - strand', ha='center', va='center', transform=ax.transAxes)
+                else:
+                    ax.fill_between(x=track_df.index, y1=0, y2=list(track_df["-"]),
+                        alpha=alignment_alpha, color=alignment_color[1], label="Negative strand")
+                a = ax.legend(bbox_to_anchor=(1, 1), loc=2,frameon=False)#, fontsize=fontsize)
 
             # Add x labels if last element
             ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
@@ -437,10 +446,12 @@ class JGV(object):
                 # No feature case
                 if track_df.empty:
                     ax = pl.subplot(grid[h:h+annotation_track_height])
-                    ax.text(0.5, 0.5,'No feature found in this windows',
-                        horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    ax.set_xlim((start, end))
+                    ax.text(0.5, 0.5,'No feature found', ha='center', va='center', transform=ax.transAxes)
                     ax.yaxis.set_tick_params(left=False, right=False, labelleft=False, labelright=False)
                     ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
+                    ax.ticklabel_format(useOffset=False, style='plain')
+                    ax.grid(axis="y", b=False)
                     ax.set_title (track_name)
                     h+=annotation_track_height
 
