@@ -26,13 +26,14 @@ import warnings
 
 # ipython notebook imports
 from IPython.core.display import display
-#%matplotlib inline
 
 # Third party import
-import pandas as pd
-import pylab as pl
 from matplotlib.patches import FancyArrowPatch as Arrow
 from matplotlib.gridspec import GridSpec
+import pysam
+import pandas as pd
+import numpy as np
+import pylab as pl
 
 # Local lib import
 from JGV_helper_fun import *
@@ -169,7 +170,7 @@ class JGV(object):
 
     def annotation_summary (self):
         """Display table summarizing annotation file information"""
-        if not self.alignments:
+        if not self.annotations:
             warnings.warn("No annotation track loaded")
             return None
 
@@ -308,7 +309,6 @@ class JGV(object):
         annotation_offset=None,
         annotation_label=False,
         annotation_color="grey",
-        annotation_alpha=0.5,
         **kwargs):
         """
         * refid
@@ -335,7 +335,9 @@ class JGV(object):
         * alignment_log
             if True the yscale will be log10 else it will be linear [ DEFAULT: True ]
         * alignment_color
-            collection of 2 color names for the alignment + and - tracks [DEFAULT : ("dodgerblue", "darkorange") ] #######################################
+            Tuple of 2 color for the alignment + and - tracks [DEFAULT : ("dodgerblue", "darkorange") ]
+        * alignment_alpha
+            Transparency of the alignment coverage area between 0 and 1 [ DEFAULT: 0.5 ]
         * feature_types
             Name of a valid feature type ( "exon"|"transcript"|"gene"|"CDS"...) or list of names of feature type for
             which a row will be returned. The option is not available for bed files. If not given, all features type
@@ -349,7 +351,7 @@ class JGV(object):
         * annotation_label
             If True, labels of features will be plotted. To be avoid when expecting many features [DEFAULT : False ]
         * annotation_color
-            [DEFAULT : "cadetblue" ], #######################################
+            Color of the annotation arrows [DEFAULT : "grey" ]
         * kwargs
         """
         # Verify that the sequence is in the refid list and that at least one alignment or annotation file was loaded
@@ -433,7 +435,8 @@ class JGV(object):
                 else:
                     ax.fill_between(x=track_df.index, y1=0, y2=list(track_df["-"]),
                         alpha=alignment_alpha, color=alignment_color[1], label="Negative strand")
-                a = ax.legend(bbox_to_anchor=(1, 1), loc=2,frameon=False)#, fontsize=fontsize)
+                # If elements were added to the ax
+                if ax.collections: ax.legend(bbox_to_anchor=(1, 1), loc=2,frameon=False)
 
             # Add x labels if last element
             ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
@@ -472,15 +475,15 @@ class JGV(object):
 
                         # Compute the non overlaping level where to plot the arrow
                         level = Level(offset=annotation_offset)
-
                         for n, feature in feature_df.iterrows():
                             fl = level(feature.ID, feature.start, feature.end, feature.strand)
                             if fl:
-                                ax.add_patch( Arrow( posA=[fl.start, fl.level], posB=[fl.end, fl.level], linewidth=3, color=annotation_color, arrowstyle=fl.arrowstyle))
+                                ax.add_patch( Arrow( posA=[fl.start, fl.level], posB=[fl.end, fl.level], linewidth=3,
+                                    color=annotation_color, arrowstyle=fl.arrowstyle))
                                 if annotation_label:
                                     text_end = fl.end if fl.end < end-annotation_offset else end-annotation_offset
                                     text_start = fl.start if fl.start > start+annotation_offset else start+annotation_offset
-                                    ax.text (x=text_start+ (text_end-text_start)/2, y=fl.level, s=fl.ID, horizontalalignment="center")
+                                    ax.text (x=text_start+ (text_end-text_start)/2, y=fl.level, s=fl.ID, ha="center")
 
                         ax.set_ylim(level.min_level-0.5, level.max_level+0.5)
 
@@ -490,5 +493,3 @@ class JGV(object):
                             first = False
                     # Last elemet exception
                     ax.xaxis.set_tick_params(bottom=True, labelbottom=True)
-
-        #return (alignments_dict, annotation_dict)

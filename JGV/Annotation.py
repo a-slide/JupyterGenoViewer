@@ -81,7 +81,7 @@ class Annotation(object):
             msg = "The file is not in gtf/gff3/bed format (.gff3/.gtg/.bed +-.gz). Please provide a correctly formated file"
             raise ValueError(msg)
 
-        # Sort the dataframe
+        # Sort the dataframe NOT needed as it is already done on demand when using the interval_coverage method
         #if self.verbose: print("\tSort annotation features by coordinates".format(self.ext))
         #self.df.sort_values(by=["refid","start","end"], inplace=True)
 
