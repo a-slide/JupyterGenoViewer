@@ -27,19 +27,18 @@ from os import access, R_OK
 import pandas as pd
 
 # Local lib import
-from JGV_helper_fun import *
+from JGV_helper_fun import extensions, file_basename, dir_path
 from JGV_helper_fun import jprint as print
 
 #~~~~~~~CLASS~~~~~~~#
-
 class Annotation(object):
     """
     Parse data from a file containing genomic annotation in GFF3, GTF or BED format.
     Can return the list of annotations for a given interval
     """
-
+    version = "0.0.1"
+    
     #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
-
     def __init__ (self, fp, name=None, verbose=False, ref_list=[]):
         """
          * fp
@@ -101,7 +100,6 @@ class Annotation(object):
         return ("{}-{} / Feature count {}".format(self.__class__.__name__, self.name, self.feature_count))
 
     #~~~~~~~PROPERTY METHODS~~~~~~~#
-
     @property
     def feature_count(self):
         """Number of features collected"""
@@ -138,7 +136,6 @@ class Annotation(object):
         return pd.DataFrame(self.df.groupby("type").size().sort_values(ascending=False), columns=["count"])
 
     #~~~~~~~PRIVATE METHODS~~~~~~~#
-
     def _bed_parser(self, fp, ref_list=[]):
         """Parse a bed formated file"""
         # Import the file in a dataframe
@@ -188,7 +185,6 @@ class Annotation(object):
         return df
 
     #~~~~~~~PUBLIC METHODS~~~~~~~#
-
     def interval_features (self, refid, start, end, feature_types=None, max_features_per_type=None):
         """
         Parse the annotation file for the given refid and interval and return a dataframe containing all the features

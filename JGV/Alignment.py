@@ -31,19 +31,18 @@ import pandas as pd
 import numpy as np
 
 # Local lib import
-from JGV_helper_fun import *
+from JGV_helper_fun import extensions, file_basename, dir_path
 from JGV_helper_fun import jprint as print
 
 #~~~~~~~CLASS~~~~~~~#
-
 class Alignment(object):
     """
     Parse data and compute the base resolution coverage from a file containing aligned reads in BAM, SAM or BED format.
     Can return the coverage for a given interval
     """
-
+    version = "0.0.1"
+    
     #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
-
     def __init__ (self, fp, name=None, verbose=False, min_coverage=5, ref_list=[], output_bed=False):
         """
          * fp
@@ -115,7 +114,6 @@ class Alignment(object):
         return ("{}-{} / Base coverage {}".format(self.__class__.__name__, self.name, self.nbases))
 
     #~~~~~~~PROPERTY METHODS~~~~~~~#
-
     @property
     def refid_list(self):
         """List of unique reference sequence ids found"""
@@ -135,7 +133,6 @@ class Alignment(object):
         return len(self.d)
 
     #~~~~~~~PRIVATE METHODS~~~~~~~#
-
     def _bam_parser(self, fp, min_coverage=5, ref_list= []):
         """Parse a sam or bam formated file"""
         d = OrderedDict()
@@ -219,7 +216,6 @@ class Alignment(object):
             str_buf = ""
 
     #~~~~~~~PUBLIC METHODS~~~~~~~#
-
     def interval_coverage (self, refid, start, end, bins=500, bin_repr_fun = "max"):
         """
         Parse the alignment file for a given refid and interval. The interval is splited in a number of windows equal to

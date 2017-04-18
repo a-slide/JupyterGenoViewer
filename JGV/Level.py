@@ -24,11 +24,13 @@
 from collections import OrderedDict, namedtuple, Counter
 
 #~~~~~~~CLASS~~~~~~~#
-
 class Level (object):
     """
     Compute the level of a given feature on the Annotation track to avoid annotation overlaping
     """
+    version = "0.0.1"
+
+    #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
     def __init__ (self,
                   max_depth=100,
                   offset=10,
@@ -91,6 +93,7 @@ class Level (object):
         """Return the total number of levels index"""
         return len(self.level_dict)
 
+    #~~~~~~~PUBLIC METHODS~~~~~~~#
     def __call__ (self, ID, start, end, strand):
         """
         Compute the level of an annnotation feature based on the instance options and the other features previously

@@ -30,18 +30,17 @@ import csv
 import pandas as pd
 
 # Local lib import
-from JGV_helper_fun import *
+from JGV_helper_fun import extensions, file_basename, dir_path
 from JGV_helper_fun import jprint as print
 
 #~~~~~~~CLASS~~~~~~~#
-
 class Reference(object):
     """
     Parse a fasta reference file or a fasta index and save the list of reference sequences ids and their lengths
     """
+    version = "0.0.1"
 
     #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
-
     def __init__ (self, fp, name=None, verbose=False, ref_list=[], output_index=False):
         """
          * fp
@@ -133,7 +132,6 @@ class Reference(object):
         return ("{}-{} / Refid count {}".format(self.__class__.__name__, self.name, self.refid_count))
 
     #~~~~~~~PROPERTY METHODS~~~~~~~#
-
     @property
     def refid_list(self):
         """List of all the sequence ids found in the annotation file"""
@@ -145,7 +143,6 @@ class Reference(object):
         return len(self.d)
 
     #~~~~~~~PUBLIC METHODS~~~~~~~#
-
     def get_refid_len (self, refid):
         """ Return the length of a given refid, If the reference is not found return None"""
         if refid not in self.d:

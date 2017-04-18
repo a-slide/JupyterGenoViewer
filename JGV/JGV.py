@@ -20,36 +20,47 @@
   Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 """
 
-# Strandard library imports
+# Standard library imports
 from collections import OrderedDict
 import warnings
+from sys import exit as sysexit
 
-# ipython notebook imports
-from IPython.core.display import display
-
-# Third party import
-from matplotlib.patches import FancyArrowPatch as Arrow
-from matplotlib.gridspec import GridSpec
-import pysam
-import pandas as pd
-import numpy as np
-import pylab as pl
+# Third party imports
+try:
+    current= "Numpy 1.11.1"
+    import numpy as np
+    current = "Matplotlib 1.5.1"
+    from matplotlib.patches import FancyArrowPatch as Arrow
+    from matplotlib.gridspec import GridSpec
+    import pylab as pl
+    current = "Pandas 0.18.1"
+    import pandas as pd
+    current = "Pysam 0.9.0"
+    import pysam
+    current = "Jupyter 4.1.0"
+    cfg = get_ipython()
+    from IPython.core.display import display
+except (NameError, ImportError):
+    print ("The third party package {}+ is required by JVG. Please verify your dependencies".format(current))
+    sysexit()
 
 # Local lib import
-from JGV_helper_fun import *
-from JGV_helper_fun import jprint as print
-from Reference import Reference
-from Annotation import Annotation
-from Alignment import Alignment
-from Level import Level
-
+try:
+    from JGV_helper_fun import extensions, file_basename, dir_path, color_palette
+    from JGV_helper_fun import jprint as print
+    from Reference import Reference
+    from Annotation import Annotation
+    from Alignment import Alignment
+    from Level import Level
+except ImportError:
+    print ("Can not import the local packages. Please verify JVG source code directory")
+    sysexit()
 
 #~~~~~~~CLASS~~~~~~~#
-
 class JGV(object):
+    version = "0.0.1"
 
     #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
-
     def __init__ (self, fp, name=None, verbose=False, ref_list=[], output_index=False):
         """
          * fp
@@ -97,7 +108,6 @@ class JGV(object):
         return (msg)
 
     #~~~~~~~PUBLIC SET METHODS~~~~~~~#
-
     def add_annotation(self, fp, name=None):
         """
          * fp
@@ -165,8 +175,6 @@ class JGV(object):
                     warnings.warn("No coverage found for {}".format(refid))
 
         self.alignments.append(a)
-
-    #~~~~~~~PUBLIC GENERAL METHODS~~~~~~~#
 
     def annotation_summary (self):
         """Display table summarizing annotation file information"""
