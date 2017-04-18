@@ -384,7 +384,7 @@ class JGV(object):
             for a in self.alignments:
                 alignments_dict[a.name] = a.interval_coverage(
                     refid=refid, start=start, end=end, bins=alignment_bins, bin_repr_fun=alignment_bin_repr_fun)
-                # +1 for space barwtween tracks
+                # +1 for space bewtween tracks
                 figheight += alignment_track_height+1
 
         # Extract feature annotation data and compute the feature tracks height
@@ -398,9 +398,8 @@ class JGV(object):
                     max_features_per_type=max_features_per_type)
                 # Take empty df into account for ploting
                 n = 1 if annotation_dict[a.name].empty else annotation_dict[a.name].type.nunique()
-                figheight += n*annotation_track_height
-            # +1 for space barwtween tracks
-            figheight+=1
+                # +1 for space bewtween tracks
+                figheight += n*annotation_track_height+1
 
         # Create a pylot figure object with an empty grid
         fig = pl.figure (figsize= (figwidth, figheight))
