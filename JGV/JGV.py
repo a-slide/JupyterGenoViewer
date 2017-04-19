@@ -46,14 +46,19 @@ except (NameError, ImportError):
 
 # Local lib import
 try:
+    current = "JGV_helper_fun"
     from JGV_helper_fun import extensions, file_basename, dir_path, color_palette
     from JGV_helper_fun import jprint as print
+    current = "Reference"
     from Reference import Reference
+    current = "Annotation"
     from Annotation import Annotation
+    current = "Alignment"
     from Alignment import Alignment
+    current = "Level"
     from Level import Level
 except ImportError:
-    print ("Can not import the local packages. Please verify JVG source code directory")
+    print ("Can not import the local packages {}. Please verify JVG source code directory".format(current))
     sysexit()
 
 #~~~~~~~CLASS~~~~~~~#
