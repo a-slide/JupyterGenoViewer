@@ -321,6 +321,7 @@ class JGV(object):
         max_features_per_type=500,
         annotation_offset=None,
         annotation_label=False,
+        max_label_size=50,
         annotation_color="grey",
         **kwargs):
         """
@@ -363,6 +364,8 @@ class JGV(object):
             automatically set to 1/400 of the windows to display [DEFAULT : None ]
         * annotation_label
             If True, labels of features will be plotted. To be avoid when expecting many features [DEFAULT : False ]
+        * max_label_size
+            limit the size of the label text for each feature  [DEFAULT : "50" ]
         * annotation_color
             Color of the annotation arrows [DEFAULT : "grey" ]
         * kwargs
@@ -495,7 +498,8 @@ class JGV(object):
                                 if annotation_label:
                                     text_end = fl.end if fl.end < end-annotation_offset else end-annotation_offset
                                     text_start = fl.start if fl.start > start+annotation_offset else start+annotation_offset
-                                    ax.text (x=text_start+ (text_end-text_start)/2, y=fl.level, s=fl.ID, ha="center")
+                                    text = fl.ID[0:max_label_size]+"..." if len(fl.ID) > max_label_size else fl.ID
+                                    ax.text (x=text_start+ (text_end-text_start)/2, y=fl.level, s=text, ha="center", fontsize=8)
 
                         ax.set_ylim(level.min_level-0.5, level.max_level+0.5)
 
