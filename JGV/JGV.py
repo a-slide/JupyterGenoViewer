@@ -1,69 +1,60 @@
 # -*- coding: utf-8 -*-
 
-"""
-  JGV.py
-  JGV is a Python3 package for an embed genomic viewer in Jupyter notebook. Do not import the package in a
-  non-interactive environment
-
-  Copyright 2016 Adrien Leger <aleg@ebi.ac.ul>
-  [Github](https://github.com/a-slide)
-
-  This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public
-  License as published by the Free Software Foundation; either version 3 of the License, or(at your option) any later
-  version
-
-  This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-  (http://www.gnu.org/licenses/gpl-3.0.html).
-
-  You should have received a copy of the GNU General Public License along with this program; if not, write to the Free
-  Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-"""
-
 # Standard library imports
 from collections import OrderedDict
 import warnings
 from sys import exit as sysexit
 
+# Local lib import
+try:
+    from JGV.JGV_helper_fun import extensions, file_basename, dir_path, color_palette, jprint, jhelp, get_sample_file
+    from JGV.JGV_Reference import Reference
+    from JGV.JGV_Annotation import Annotation
+    from JGV.JGV_Alignment import Alignment
+    from JGV.JGV_Level import Level
+except ImportError as E:
+    try:
+        from JGV_helper_fun import extensions, file_basename, dir_path, color_palette, jprint, jhelp, get_sample_file
+        from JGV_Reference import Reference
+        from JGV_Annotation import Annotation
+        from JGV_Alignment import Alignment
+        from JGV_Level import Level
+    except ImportError as E:
+        print(E)
+        print ("Can not import a local packages. Please verify source code directory")
+        sysexit()
+    
 # Third party imports
 try:
-    current= "Numpy 1.11.1"
     import numpy as np
-    current = "Matplotlib 1.5.1"
     from matplotlib.patches import FancyArrowPatch as Arrow
     from matplotlib.gridspec import GridSpec
     import pylab as pl
-    current = "Pandas 0.18.1"
     import pandas as pd
-    current = "Pysam 0.9.0"
     import pysam
-    current = "Jupyter 4.1.0"
     cfg = get_ipython()
     from IPython.core.display import display
-except (NameError, ImportError):
-    print ("The third party package {}+ is required by JVG. Please verify your dependencies".format(current))
-    sysexit()
-
-# Local lib import
-try:
-    current = "JGV_helper_fun"
-    from JGV_helper_fun import extensions, file_basename, dir_path, color_palette
-    from JGV_helper_fun import jprint as print
-    current = "Reference"
-    from Reference import Reference
-    current = "Annotation"
-    from Annotation import Annotation
-    current = "Alignment"
-    from Alignment import Alignment
-    current = "Level"
-    from Level import Level
-except ImportError:
-    print ("Can not import the local packages {}. Please verify JVG source code directory".format(current))
+except ImportError as E:
+    print (E)
+    jprint ("A third party package is missing. Please verify your dependencies")
     sysexit()
 
 #~~~~~~~CLASS~~~~~~~#
 class JGV(object):
-    version = "0.0.1"
+    
+    ##~~~~~~~ SAMPLE FILES ~~~~~~~#
+    @ classmethod
+    def get_example_bam (self):
+        return get_sample_file("JGV","JGV/data/yeast.bam")
+    @ classmethod
+    def get_example_fasta (self):
+        return get_sample_file("JGV","JGV/data/yeast.fa.gz")
+    @ classmethod
+    def get_example_gtf (self):
+        return get_sample_file("JGV","JGV/data/yeast.gtf.gz")
+    @ classmethod
+    def get_example_gff3 (self):
+        return get_sample_file("JGV","JGV/data/yeast.gff3.gz")
 
     #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
     def __init__ (self, fp, name=None, verbose=False, ref_list=[], output_index=False):
@@ -90,7 +81,7 @@ class JGV(object):
         self.ref_list = ref_list
 
         # Store the reference genome informations
-        if self.verbose: print("Add reference genome file", bold=True)
+        if self.verbose: jprint("Add reference genome file", bold=True)
         self.reference = Reference(
             fp=fp,
             name=name,
@@ -126,7 +117,7 @@ class JGV(object):
             Name of the data file that will be used as track name for plotting. If not given, will be deduced from fp
             file name  [ DEFAULT: None ]
         """
-        if self.verbose: print("Add annotation file", bold=True)
+        if self.verbose: jprint("Add annotation file", bold=True)
         a = Annotation(
             fp=fp,
             name=name,
@@ -134,9 +125,9 @@ class JGV(object):
             ref_list=self.ref_list)
 
         if self.verbose:
-            for refid in self.reference.refid_list:
-                if refid not in  a.refid_list:
-                    warnings.warn("No annotation found for {}".format(refid))
+            not_found = set(self.reference.refid_list) - set(a.refid_list)
+            if not_found:
+                warnings.warn("No annotation found for {}".format(",".join(not_found)))
 
         self.annotations.append(a)
 
@@ -147,8 +138,7 @@ class JGV(object):
              header. The files do not need to be sorted or indexed.
              One can also use a 6 fields bed (chrom, chromStart, chromEnd, name, score, strand) file with a hastaged
              commented header listing the reference sequences id and length, similar to the format generated by the
-             output_bed option (Much faster than from a Bam/Sam file, can be gzipped).
-             http://www.ensembl.org/info/website/upload/bed.html
+             output_bed option (Much faster than from a Bam/Sam file, can be gzipped). http://www.ensembl.org/info/website/upload/bed.html
         *  name
             Name of the data file that will be used as track name for plotting. If not given, will be deduced from fp
             file name  [ DEFAULT: None ]
@@ -165,7 +155,7 @@ class JGV(object):
               chr20	276516	276516	pos1	5	+
               chr20	276517	276517	pos2	5	+
         """
-        if self.verbose: print("Add alignment file", bold=True)
+        if self.verbose: jprint("Add alignment file", bold=True)
         a = Alignment(
             fp=fp,
             name=name,
@@ -175,9 +165,9 @@ class JGV(object):
             output_bed=output_bed)
 
         if self.verbose:
-            for refid in self.reference.refid_list:
-                if refid not in  a.refid_list:
-                    warnings.warn("No coverage found for {}".format(refid))
+            not_found = set(self.reference.refid_list) - set(a.refid_list)
+            if not_found:
+                warnings.warn("No coverage found for {}".format(",".join(not_found)))
 
         self.alignments.append(a)
 
@@ -200,12 +190,12 @@ class JGV(object):
             tcu.columns=[a.name]
             tcu_df = pd.merge(left=tcu_df, right=tcu, how='outer', right_index=True, left_index=True)
 
-        print("Counts per Annotation file", bold=True)
+        jprint("Counts per Annotation file", bold=True)
         display(count_df)
-        print("Counts per Reference sequence", bold=True)
+        jprint("Counts per Reference sequence", bold=True)
         rcu_df.sort_index()
         display(rcu_df)
-        print("Counts per feature types", bold=True)
+        jprint("Counts per feature types", bold=True)
         tcu_df.sort_index()
         display(tcu_df)
 
@@ -224,9 +214,9 @@ class JGV(object):
             rbc.columns=[a.name]
             rbc_df = pd.merge(left=rbc_df, right=rbc, how='outer', right_index=True, left_index=True)
 
-        print("Counts per Alignment file", bold=True)
+        jprint("Counts per Alignment file", bold=True)
         display(count_df)
-        print("Counts per Reference sequence", bold=True)
+        jprint("Counts per Reference sequence", bold=True)
         rbc_df.sort_index()
         display(rbc_df)
 
@@ -381,22 +371,22 @@ class JGV(object):
         # Auto define start and stop and overlapping annotation offset if not given
         if not start:
             start = 0
-            if self.verbose: print ("Autodefine start position: {}".format(start))
+            if self.verbose: jprint ("Autodefine start position: {}".format(start))
         if not end:
             end = self.reference.get_refid_len(refid)-1
-            if self.verbose: print ("Autodefine end position: {}".format(end))
+            if self.verbose: jprint ("Autodefine end position: {}".format(end))
         if start >= end:
             raise ValueError ("Invalid coordinates (start: {}, end :{}) start has to be greater than end")
         if not annotation_offset:
             annotation_offset = int((end-start)/400)
-            if self.verbose:print ("Estimated overlap offset: {}".format(annotation_offset))
+            if self.verbose:jprint ("Estimated overlap offset: {}".format(annotation_offset))
 
         figheight = 0
 
         # Extract alignment coverage data and compute the coverage tracks height
         alignments_dict = OrderedDict()
         if self.alignments:
-            if self.verbose: print ("Extract alignment data", bold=True)
+            if self.verbose: jprint ("Extract alignment data", bold=True)
             for a in self.alignments:
                 alignments_dict[a.name] = a.interval_coverage(
                     refid=refid, start=start, end=end, bins=alignment_bins, bin_repr_fun=alignment_bin_repr_fun)
@@ -407,7 +397,7 @@ class JGV(object):
         annot_tracks_heigth = 0
         annotation_dict = OrderedDict()
         if self.annotations:
-            if self.verbose: print ("Extract annotation data", bold=True)
+            if self.verbose: jprint ("Extract annotation data", bold=True)
             for a in self.annotations:
                 annotation_dict[a.name] = a.interval_features(
                     refid=refid, start=start, end=end, feature_types=feature_types,
@@ -426,7 +416,7 @@ class JGV(object):
         h = 0
         if self.alignments:
             for track_name, track_df in alignments_dict.items():
-                if self.verbose: print ("\tAlignment track name: {}".format(track_name))
+                if self.verbose: jprint ("\tAlignment track name: {}".format(track_name))
 
                 # Prepare the subplot grid
                 ax = pl.subplot(grid[h:h+alignment_track_height])
@@ -459,7 +449,7 @@ class JGV(object):
         if self.annotations:
             for track_name, track_df in annotation_dict.items():
                 h+=1
-                if self.verbose: print ("\tAlignment track name: {}".format(track_name))
+                if self.verbose: jprint ("\tAlignment track name: {}".format(track_name))
 
                 # No feature case
                 if track_df.empty:

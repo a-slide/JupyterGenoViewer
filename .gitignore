@@ -89,4 +89,4 @@ ENV/
 .ropeproject
 
 # Do not include large size test Data downloaded for testing purposes 
-dl_test_data/
+JGV/downloaded_data/

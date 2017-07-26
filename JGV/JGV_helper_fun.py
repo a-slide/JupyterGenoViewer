@@ -1,30 +1,13 @@
 # -*- coding: utf-8 -*-
 
-"""
-  JGV_helper_fun.py
-  JGV is a Python3 package for an embed genomic viewer in Jupyter notebook. Do not import the package in a
-  non-interactive environment
+# Standard library imports
+import os
 
-  Copyright 2016 Adrien Leger <aleg@ebi.ac.ul>
-  [Github](https://github.com/a-slide)
-
-  This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public
-  License as published by the Free Software Foundation; either version 3 of the License, or(at your option) any later
-  version
-
-  This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-  warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-  (http://www.gnu.org/licenses/gpl-3.0.html).
-
-  You should have received a copy of the GNU General Public License along with this program; if not, write to the Free
-  Software Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
-"""
-# notebook display functions
-from IPython.core.display import display, HTML
-
-# Third party import
+# Third party imports
 from matplotlib.cm import get_cmap
+from IPython.core.display import display, HTML, Markdown
 
+#~~~~~~~FUNCTIONS~~~~~~~#
 def extensions (fp):
     """
     Return the extension of a file in lower-case.
@@ -86,8 +69,7 @@ def color_palette(n, colormap="brg"):
 
 def jprint(*args, **kwargs):
     """
-    Format a string in HTML and print the output. Equivalent of print, but highly customizable
-    Many options can be passed to the function.
+    Format a string in HTML and print the output. Equivalent of print, but highly customizable. Many options can be passed to the function.
     * args
         One or several objects that can be cast in str
     ** kwargs
@@ -124,3 +106,58 @@ def jprint(*args, **kwargs):
     else: s = "<p>{}</p>".format(s)
 
     display(HTML(s))
+
+def jhelp(function, full=False):
+    """
+    Print a nice looking help string based on the name of a declared function. By default print the function definition and description 
+    * full
+        If True, the help string will included a description of all arguments
+    """
+    try:
+        # For some reason signature is not aways importable. In these cases the build-in help in invoqued
+        from inspect import signature, isfunction, ismethod
+        if isfunction(function) or ismethod(function):
+            name = function.__name__.strip()
+            sig = str(signature(function)).strip()
+            display(HTML ("<b>{}</b> {}".format(name, sig)))
+            
+            if function.__doc__:
+                for line in function.__doc__.split("\n"):
+                    line = line.strip()
+                    if not full and line.startswith("*"):
+                        break
+                    display(Markdown(line.strip()))
+        else:
+            jprint("{} is not a function".format(function))
+
+    except Exception:
+        help(function)
+
+def get_sample_file (package, path):
+    """
+    Verify the existence and return a file from the package data
+    * package
+        Name of the package
+    * path
+        Relative path to the file in the package. Usually package_name/data/file_name 
+    """
+    try:
+        # Try to extract package with pkg_resources lib
+        from pkg_resources import Requirement, resource_filename
+        fp = resource_filename(Requirement.parse(package), path)
+        if not os.access(fp, os.R_OK):
+            raise IOError("Can not read {}".format(fp))
+        else:
+            return fp
+        
+        # Try local package instead
+        fp = path
+        if not os.access(fp, os.R_OK):
+            raise IOError("Can not read {}".format(fp))
+        else:
+            return fp
+                
+    except Exception as E:
+        jprint(E)
+        jprint ("Please retrieve it from the github repository")
+        return
