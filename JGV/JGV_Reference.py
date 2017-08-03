@@ -8,17 +8,7 @@ import csv
 
 # Third party import
 import pandas as pd
-
-# Local lib import
-try:
-    from JGV.JGV_helper_fun import extensions, file_basename, dir_path, jprint
-except (NameError, ImportError) as E:
-    try:
-        from JGV_helper_fun import extensions, file_basename, dir_path, jprint
-    except (NameError, ImportError) as E:
-        print(E)
-        print ("Can not import a local packages. Please verify source code directory")
-        sysexit()
+from pycl.pycl import extensions_list, file_basename, dir_path, jprint, is_readable_file
 
 #~~~~~~~CLASS~~~~~~~#
 class Reference(object):
@@ -27,7 +17,7 @@ class Reference(object):
     """
 
     #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
-    def __init__ (self, fp, name=None, verbose=False, ref_list=[], output_index=False):
+    def __init__ (self, fp, name=None, refid_list=[], output_index=False, verbose=False, **kwargs):
         """
          * fp
             A fasta file containing the reference sequences OR an tab separated index file containing at least 2 columns
@@ -38,27 +28,23 @@ class Reference(object):
         *  name
             Name of the data file that will be used as track name for plotting. If not given, will be deduced from fp
             file name
-        * verbose
-            If True, will print more information during initialisation and calls of all the object methods
-            [ DEFAULT: False ]
-        * ref_list
+        * refid_list
             list of reference sequence id to select from the data file, by default all [ DEFAULT: [] ]
         * output_index
             If True will write a simple A 2 column index tsv file containing the Reference sequence ids and their
             lengths [ DEFAULT: False ]
         """
         # Verify that the file is readable
-        assert access(fp, R_OK), "{} is not readable".format(fp)
+        is_readable_file(fp)
 
         #Save self variable
         self.fp = fp
         self.name = name if name else file_basename(fp)
-        self.verbose = verbose
-        self.ext = extensions(fp)[0]
+        self.ext = extensions_list(fp)[0]
 
         # If the file is in fasta format
         if self.ext in ["fa", "fasta"]:
-            if self.verbose: jprint ("Parsing fasta file")
+            if verbose: jprint ("Parsing fasta file")
 
             # File handling for both uncompressed or compressed fasta file
             if fp.endswith(".gz"):
@@ -66,21 +52,24 @@ class Reference(object):
             else:
                 open_fun, open_mode = open, "r"
 
-            # Parse fasta file refid and count the length of each sequence if in the ref_list
+            # Parse fasta file refid and count the length of each sequence if in the refid_list
             with open_fun(fp, open_mode) as f:
                 d = OrderedDict()
                 last_ref = None
                 for l in f:
                     if l.startswith(">"):
                         refid = l[1:].split()[0].strip()
-                        if not ref_list or refid in ref_list:
+                        if not refid_list or refid in refid_list:
                             d[refid] = 0
                             last_ref = refid
                         else:
                             last_ref = None
                     elif last_ref:
                         d[last_ref] += len(l.strip())
-
+            
+            # Check if sequences found 
+            assert d, "No Sequence found"
+            
             # Transform the counter in a Dataframe and sort by length
             self.d = pd.Series(d, name="length", dtype = "int64")
             self.d.sort_values(inplace=True, ascending=False)
@@ -88,34 +77,22 @@ class Reference(object):
             # Write the index in a file for quicker loading next time
             if output_index:
                 index_file = "{}/{}.tsv".format(dir_path(fp), file_basename(fp))
-                if self.verbose: jprint ("Write a fasta index file: {}".format(index_file))
+                if verbose: jprint ("Write a fasta index file: {}".format(index_file))
                 self.d.to_csv(index_file, sep="\t")
 
         # In the case the file is not in fasta format, try to parse it as a 2 columns tabulated file with refid and length for each sequence
         else:
-            if self.verbose: jprint ("Assume the file is a fasta index")
+            if verbose: jprint ("Assume the file is a fasta index")
             self.d = pd.read_csv(fp, sep="\t", squeeze=True, comment="#",  usecols=[0,1], index_col=0, header=None)
-            if ref_list: self.d = self.d[(self.d.index.isin(ref_list))]
+            if refid_list: self.d = self.d[(self.d.index.isin(refid_list))]
             self.d.name= "length"
             self.d.sort_values(inplace=True, ascending=False)
 
-        if self.verbose:
+        if verbose:
             jprint ("\tFound {} reference sequences".format(self.refid_count))
 
-    def __str__(self):
-        """readable description of the object"""
-        msg = "{} instance\n".format(self.__class__.__name__)
-        # list all values in object dict in alphabetical order
-        for k,v in OrderedDict(sorted(self.__dict__.items(), key=lambda t: t[0])).items():
-            if k == "d":
-                for refid, length in v.items():
-                    msg+="\t\t{}\tlength: {}\n".format(refid, length)
-            else:
-                msg+="\t{}\t{}\n".format(k, v)
-        return (msg)
-
     def __repr__ (self):
-        return ("{}-{} / Refid count {}".format(self.__class__.__name__, self.name, self.refid_count))
+        return ("{}: {} - Reference count {}".format(self.__class__.__name__, self.name, self.refid_count))
 
     #~~~~~~~PROPERTY METHODS~~~~~~~#
     @property
@@ -129,10 +106,10 @@ class Reference(object):
         return len(self.d)
 
     #~~~~~~~PUBLIC METHODS~~~~~~~#
-    def get_refid_len (self, refid):
+    def get_refid_len (self, refid, verbose=False, **kwargs):
         """ Return the length of a given refid, If the reference is not found return None"""
         if refid not in self.d:
-            if self.verbose: jprint("The reference sequence {} was not found in the reference list".format(refid))
+            if verbose: jprint ("The reference sequence {} was not found in the reference list".format(refid))
             return None
         else:
             return self.d[refid]

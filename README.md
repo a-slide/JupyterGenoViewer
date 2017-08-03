@@ -1,5 +1,4 @@
-
-# Jupyter Genomic Viewer
+# JGV 1.0a2 package documentation
 
 ___
 **JGV is an embed genomic viewer for Jupyter notebook written in python3**
@@ -74,10 +73,10 @@ from JGV.JGV import jhelp, jprint
 A sample test file can be loaded from the package as well
 
 ```python
-example_bam = JGV.get_example_bam()
-example_fasta = JGV.get_example_fasta()
-example_gtf = JGV.get_example_gtf()
-example_gff3 = JGV.get_example_gff3()
+example_bam = JGV.example_bam()
+example_fasta = JGV.example_fasta()
+example_gtf = JGV.example_gtf()
+example_gff3 = JGV.example_gff3()
 
 jprint(example_bam)
 jprint(example_fasta)
@@ -117,7 +116,7 @@ j = JGV(fp=example_fasta, verbose=True, ref_list=["I","II","III"])
 
 <p>Parsing fasta file</p>
 
-<p>&emsp;Found 3 reference sequences</p>
+<p>&emsp;Found 17 reference sequences</p>
 
 Finally, instead of a fasta file, one can provide a tab separated index file containing at least 2 columns with the refid(chromosome name) and the length of the sequence, such as a fasta index create by faidx or with the *output_index* option of JGV
 
@@ -152,23 +151,11 @@ Once initialized a JGV object can parse and save annotation files (gff3, gtf and
 j.add_annotation(example_gtf, name="yeastMine")
 ```
 
-<p><b>Add annotation file</b></p>
-
-<p>Use GTF parser to parse annotations in yeastMine</p>
-
-<p>&emsp;Found 42071 features in 17 reference sequences</p>
-
 Several annotation can be loaded. Warnings will be thrown if there are chromosomes found in the reference sequence have no feature in the annotation file
 
 ```python
 j.add_annotation(example_gff3, name="Ensembl")
 ```
-
-<p><b>Add annotation file</b></p>
-
-<p>Use GFF3 parser to parse annotations in  Ensembl</p>
-
-<p>&emsp;Found 28872 features in 17 reference sequences</p>
 
 Information about the annotations can be obtained with annotation_summary
 
@@ -419,16 +406,6 @@ JGV objects can also parse and compute the coverage from alignment files (bam, s
 j.add_alignment(example_bam, name="RNA-Seq")
 ```
 
-<p><b>Add alignment file</b></p>
-
-<p>Compute coverage from bam/sam file  /home/aleg/Programming/Python3/JupyterGenoViewer/JGV/data/yeast.bam</p>
-
-<p>&emsp;Tally coverage for each base</p>
-
-<p>&emsp;Filter and sort the coverage results by position</p>
-
-<p>&emsp;Total base coverage 4051804 in 17 reference sequences</p>
-
 Similar to annotation, JGV also has an alignment_summary function
 
 ```python
@@ -543,13 +520,13 @@ Simple visualization to have a first idea of the sequencing coverage, with many 
 r = j.refid_coverage_plot()
 ```
 
-![png](extra/output_48_0.png)
+![png](extra/extra/output_48_0.png)
 
 ```python
 r = j.refid_coverage_plot(norm_depth=False, norm_len=False, log=True, color="dodgerblue", alpha=0.5)
 ```
 
-![png](extra/output_49_0.png)
+![png](extra/extra/output_49_0.png)
 
 ### Plotting the coverage and annotation features of a specific window
 
@@ -581,7 +558,7 @@ j.interval_plot("VI", feature_types=["gene", "transcript", "CDS"])
 
 <p>&emsp;Alignment track name: Ensembl</p>
 
-![png](extra/output_52_11.png)
+![png](extra/extra/output_52_11.png)
 
 ```python
 j.interval_plot("VI", start=220000, end=225000)
@@ -605,7 +582,7 @@ j.interval_plot("VI", start=220000, end=225000)
 
 <p>&emsp;Alignment track name: Ensembl</p>
 
-![png](extra/output_53_9.png)
+![png](extra/extra/output_53_9.png)
 
 # Note to developers
 
