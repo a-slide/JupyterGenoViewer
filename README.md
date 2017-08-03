@@ -520,13 +520,13 @@ Simple visualization to have a first idea of the sequencing coverage, with many 
 r = j.refid_coverage_plot()
 ```
 
-![png](extra/extra/output_48_0.png)
+![png](extra/output_48_0.png)
 
 ```python
 r = j.refid_coverage_plot(norm_depth=False, norm_len=False, log=True, color="dodgerblue", alpha=0.5)
 ```
 
-![png](extra/extra/output_49_0.png)
+![png](extra/output_49_0.png)
 
 ### Plotting the coverage and annotation features of a specific window
 
@@ -558,7 +558,7 @@ j.interval_plot("VI", feature_types=["gene", "transcript", "CDS"])
 
 <p>&emsp;Alignment track name: Ensembl</p>
 
-![png](extra/extra/output_52_11.png)
+![png](extra/output_52_11.png)
 
 ```python
 j.interval_plot("VI", start=220000, end=225000)
@@ -582,7 +582,7 @@ j.interval_plot("VI", start=220000, end=225000)
 
 <p>&emsp;Alignment track name: Ensembl</p>
 
-![png](extra/extra/output_53_9.png)
+![png](extra/output_53_9.png)
 
 # Note to developers
 
