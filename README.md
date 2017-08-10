@@ -1,25 +1,52 @@
 # JGV 1.0a2 package documentation
 
-___
+---
+
 **JGV is an embed genomic viewer for Jupyter notebook written in python3**
-___
+
+---
+
+JGV is a lightweight genomic viewer, taking advantage of maplotlib python library to generate annotation and
+sequencing coverage plots. The genomic interval plotting method is higly customizable and allow users to analyse their results in a jupyter
+notebook directly. The package can parse a variety of standard annotation file (bed, gff3, gtf...) and compute the sequencing coverage
+from SAM or BAM files as well as from bed coverage files
+
+* Author: Adrien Leger - aleg@ebi.ac.uk
+
+* URL: https://github.com/a-slide/JupyterGenoViewer
+
+* Licence: GPLv3
 
 # Installation
 
 Ideally, before installation, create a clean python3 virtual environment to deploy the package, using virtualenvwrapper for example (see http://www.simononsoftware.com/virtualenv-tutorial-part-2/).
+
+## Python packages dependencies:
+
+* numpy>=1.11.1
+
+* pandas>=0.18.1
+
+* matplotlib>=1.5.1
+
+* pysam>= 0.9.0
+
+* notebook>=4.0.0
+
+* pycl>=1.0.3
 
 ## Installation with pip from github
 
 Install the package with pip3. All the required dependencies will be automatically installed.
 
 ```bash
-pip3 install git+https://github.com/a-slide/JupyterGenoViewer.git
+pip3 install git+https://github.com/a-slide/JupyterGenoViewer.git --process-dependency-links
 ```
 
 To update the package:
 
 ```bash
-pip3 install git+https://github.com/a-slide/JupyterGenoViewer.git --upgrade
+pip3 install git+https://github.com/a-slide/JupyterGenoViewer.git --upgrade --process-dependency-links
 ```
 
 # Usage
@@ -28,20 +55,22 @@ The package is meant to be used in a jupyter notebook 4.0.0 +
 
 ## Notebook setup
 
-Launch the notebook, navigate in the directory where you want to work and create a new python3 notebook
+Launch the notebook in a terminal
 
 ```bash
 jupyter notebook
 ```
 
-Import pylab (from matplotlib + numpy) and use %pylab magic command to enable plotting in the current Notebook.
+If it does not autolaunch your web browser, open manually the following URL http://localhost:8888/tree 
+
+From Jupyter home page you can navigate to the directory you want to work in. Then, create a new Python3 Notebook.
+
+In the notebook, import matplotlib and use the jupyter magic command to enable direct plotting in the current Notebook.
 
 ```python
-import pylab as pl
-%pylab inline
+import matplotlib.pyplot as pl
+%matplotlib inline
 ```
-
-    Populating the interactive namespace from numpy and matplotlib
 
 Default pylab parameters can be defined at the beginning of the notebook as well (see http://matplotlib.org/users/customizing.html for more options)
 
@@ -165,6 +194,7 @@ j.annotation_summary()
 
 <p><b>Counts per Annotation file</b></p>
 
+<div>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -189,9 +219,11 @@ j.annotation_summary()
     </tr>
   </tbody>
 </table>
+</div>
 
 <p><b>Counts per Reference sequence</b></p>
 
+<div>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -293,9 +325,11 @@ j.annotation_summary()
     </tr>
   </tbody>
 </table>
+</div>
 
 <p><b>Counts per feature types</b></p>
 
+<div>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -397,6 +431,7 @@ j.annotation_summary()
     </tr>
   </tbody>
 </table>
+</div>
 
 ### Adding alignment files
 
@@ -414,6 +449,7 @@ j.alignment_summary()
 
 <p><b>Counts per Alignment file</b></p>
 
+<div>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -430,9 +466,11 @@ j.alignment_summary()
     </tr>
   </tbody>
 </table>
+</div>
 
 <p><b>Counts per Reference sequence</b></p>
 
+<div>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -511,6 +549,7 @@ j.alignment_summary()
     </tr>
   </tbody>
 </table>
+</div>
 
 ### Generate a plot of coverage per refid
 
