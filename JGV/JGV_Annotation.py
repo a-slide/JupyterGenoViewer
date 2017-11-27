@@ -14,9 +14,9 @@ class Annotation(object):
     Parse data from a file containing genomic annotation in GFF3, GTF or BED format.
     Can return the list of annotations for a given interval
     """
-    
+
     #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
-    
+
     def __init__ (self, fp, name=None, min_len=None, max_len=None, refid_list=None, type_list=None, verbose=False, **kwargs):
         """
          * fp
@@ -38,11 +38,11 @@ class Annotation(object):
         if verbose: jprint ("Parse Annotation file")
         # Verify that the file is readable
         is_readable_file(fp)
-        
+
         #Save self variable
         self.fp = fp
         self.name = name if name else file_basename(fp)
-            
+
         # Find if gziped
         if has_extension (fp, pos=-1, ext=["gz","tgz"]):
             if verbose: jprint("\tFile is gziped")
@@ -60,7 +60,7 @@ class Annotation(object):
             self.feature_df = self._gff3_parser(fp=fp, compression=compression, verbose=verbose)
         elif has_extension (fp, pos=ext_pos, ext="bed"):
             self.feature_df = self._bed_parser(fp=fp, compression=compression, verbose=verbose)
-        
+
         # Else try to import as a pickled file
         else:
             try:
@@ -68,7 +68,7 @@ class Annotation(object):
             # If invalid file format
             except Exception as E:
                 raise ValueError("Cannot open file or the file is not in a valid format")
-        
+
         # Optional filterig steps
         if min_len or max_len:
             self.select_len (min_len=min_len, max_len=max_len, verbose=verbose)
@@ -76,12 +76,12 @@ class Annotation(object):
             self.select_references (refid_list=refid_list, verbose=verbose)
         if type_list:
             self.select_types (type_list=type_list, verbose=verbose)
-        
+
         # Sort the dataframe and reset index
         if verbose: jprint("Sorting and final cleanup")
         self.feature_df.sort_values(by=["refid","start","end"], inplace=True)
         self.feature_df.reset_index(drop=True, inplace=True)
-        
+
         if verbose: jprint("\tNumber of features imported: {}".format(self.feature_count))
 
     def __repr__ (self):
@@ -124,7 +124,7 @@ class Annotation(object):
         return pd.DataFrame(self.feature_df.groupby("type").size().sort_values(ascending=False), columns=["count"])
 
     #~~~~~~~PUBLIC METHODS~~~~~~~#
-    
+
     def interval_features (self, refid, start, end, feature_types=None, max_features_per_type=None, verbose=False, **kwargs):
         """
         Parse the annotation file for the given refid and interval and return a dataframe containing all the features
@@ -196,33 +196,33 @@ class Annotation(object):
         # Filter max len
         if max_len:
             self.feature_df = self.feature_df[((self.feature_df["end"]-self.feature_df["start"]) <= max_len)]
-        if verbose: jprint ("\tFeatures after maximal length filtering: {}".format(self.feature_count)) 
-    
+        if verbose: jprint ("\tFeatures after maximal length filtering: {}".format(self.feature_count))
+
     def select_references (self, refid_list, verbose=False, **kwargs):
         """ Select features which reference sequence id is in the given list or a single entry. Example: ["chr1", "chr2", "chr3"]
         """
         # Cast in list
         if type(refid_list) == str:
             refid_list = [refid_list]
-        
+
         if verbose:
             jprint ("Selecting features based on reference id")
             jprint ("\tFeatures before filtering: {}".format(self.feature_count))
         self.feature_df = self.feature_df[(self.feature_df["refid"].isin(refid_list))]
-        if verbose: jprint ("\tFeatures after filtering: {}".format(self.feature_count)) 
-    
+        if verbose: jprint ("\tFeatures after filtering: {}".format(self.feature_count))
+
     def select_types (self, type_list, verbose=False, **kwargs):
         """ Select features which type is in the given list or a single entry. Example: ["exon", "gene"]
         """
         # Cast in list
         if type(type_list) == str:
             type_list = [type_list]
-        
+
         if verbose:
             jprint ("Selecting features based on type")
             jprint ("\tFeatures before filtering: {}".format(self.feature_count))
         self.feature_df = self.feature_df[(self.feature_df["type"].isin(type_list))]
-        if verbose: jprint ("\tFeatures after filtering: {}".format(self.feature_count)) 
+        if verbose: jprint ("\tFeatures after filtering: {}".format(self.feature_count))
 
     def to_pickle (self, fp=None, verbose=False, **kwargs):
         """
@@ -235,13 +235,13 @@ class Annotation(object):
                 fp = self.fp.rpartition(".")[0]+".pkl"
             else:
                 fp = self.fp+".pkl"
-            
+
         if verbose: jprint ("Pickle dataframe in file {}".format(fp))
         self.feature_df.to_pickle(fp)
         return fp
 
     #~~~~~~~PRIVATE METHODS~~~~~~~#
-    
+
     def _bed_parser(self, fp, compression=None, verbose=False, **kwargs):
         """
         Parse a bed formated file
@@ -252,16 +252,16 @@ class Annotation(object):
             col_names = ["refid","start","end","ID","score","strand"]
             df = pd.read_csv(fp, sep="\t", names=col_names, index_col=False, comment="#", compression=compression)
             if verbose: jprint("\tSuccessfully imported as a bed6 file")
-                    
-        # else try to import as a bed12 
+
+        # else try to import as a bed12
         except IndexError as E:
             col_names = ["refid","start","end","ID","score","strand","thickStart","thickEnd","itemRgb","blockCount","blockSizes","blockStarts"]
             df = pd.read_csv(fp, sep="\t", names=col_names, index_col=False, comment="#", compression=compression)
             if verbose: jprint("\tSuccessfully imported as a bed12 file")
-                
+
         # Type is not available from bed files
         df['type'] = "."
-        
+
         # Clean df
         df = self._clean_df(df, verbose=verbose)
         return df
@@ -274,11 +274,11 @@ class Annotation(object):
         # Import the file in a dataframe
         col_names = ["refid","source","type","start","end","score","strand","frame","attribute"]
         df = pd.read_csv(fp, sep="\t", names=col_names, index_col=False, comment="#", compression=compression)
-        
+
         # Extract the ID field = first field of attribute
         df['ID'] = df["attribute"].str.split(';').str[0].str[3:]
         if verbose: jprint("\tSuccessfully imported as a gff3 file")
-        
+
         # Clean df
         df = self._clean_df(df, verbose=verbose)
         return df
@@ -291,42 +291,43 @@ class Annotation(object):
         # Import the file in a dataframe
         col_names = ["refid","source","type","start","end","score","strand","frame","attribute"]
         df = pd.read_csv(fp, sep="\t", names=col_names, index_col=False, comment="#", compression=compression)
-        
+
         # Extract the ID field = first field of attribute=
         df['ID'] = df["attribute"].str.split('\"').str[1]
         if verbose: jprint("\tSuccessfully imported as a gtf file")
-        
+
         # Clean df
         df = self._clean_df(df, verbose=verbose)
         return df
-    
+
     def _clean_df (self, df, verbose=False, **kwargs):
         """
         Clean dataframe after parsing
         """
         # Select fields
         df = df[["refid","start","end","ID","score","strand","type"]].copy()
-        
+
         # Drop column with NA values
         if verbose: jprint("\tRemove null values")
         l = len(df)
         df.dropna(inplace=True)
         if verbose: jprint("\tRemoved {} invalid lines".format(l-len(df)))
-        
+
         # Cast the start and end field in integer
-        if verbose: jprint("\tCast coordinates to integer")
+        if verbose: jprint("\tCast coordinates to integer and id to str")
         df[['start', 'end']] = df[['start', 'end']].astype(int)
-        
+        df[['ID']] = df[['ID']].astype(str)
+
         # Verify than the dataframe is not empty
         if df.empty:
             raise ValueError("No valid features imported. Is the file valid?")
         return df
-    
+
     def _pickle_parser(self, fp, verbose=False, **kwargs):
         """
         Parse a pickle database
         """
         # Import the file in a dataframe
         if verbose: jprint ("\tTry to load as a pickle file")
-        df = pd.read_pickle(fp) 
+        df = pd.read_pickle(fp)
         return df
