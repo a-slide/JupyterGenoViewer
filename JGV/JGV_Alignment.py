@@ -16,7 +16,7 @@ class Alignment(object):
     Parse data and compute the base resolution coverage from a file containing aligned reads in BAM, SAM or BED format.
     Can return the coverage for a given interval
     """
-    
+
     #~~~~~~~FUNDAMENTAL METHODS~~~~~~~#
     def __init__ (self, fp, name=None, min_coverage=5, refid_list=[], output_bed=False, verbose=False, **kwargs):
         """
@@ -60,7 +60,7 @@ class Alignment(object):
         elif self.ext == "bed":
             if verbose: jprint ("Extract coverage from bed file", self.fp)
             self.d = self._bed_parser(fp, min_coverage, refid_list)
-        
+
         else:
             msg = "The file is not in SAM/BAM/BED format. Please provide a correctly formated file"
             raise ValueError(msg)
@@ -113,6 +113,9 @@ class Alignment(object):
             # Compute the genomic coverage for each reads
             if verbose: jprint ("\tTally coverage for each base")
             for line in bam:
+                # Skip non aligned reads
+                if line.reference_id == -1:
+                    continue
                 refid = line.reference_name
                 # If not refid filter or if the refid is in the autozized list
                 if not refid_list or refid in refid_list:
@@ -123,10 +126,10 @@ class Alignment(object):
                     strand = "-" if line.is_reverse else "+"
                     for position in line.get_reference_positions():
                         d[refid][strand][position] += 1
-        
+
         d = self._clean_d (d=d, min_coverage=min_coverage, verbose=verbose)
         return d
-        
+
     def _bed_parser (self, fp, min_coverage=5, refid_list= [], verbose=False, **kwargs):
         """Extract data from a coverage bad file
         """
@@ -153,10 +156,10 @@ class Alignment(object):
                     d[refid][strand][position] = coverage
                     d[refid]["nbases"] += coverage
                     self.nbases += coverage
-                    
+
         d = self._clean_d (d=d, min_coverage=min_coverage, verbose=verbose)
         return d
-    
+
     def _clean_d (self, d, min_coverage=5, verbose=False, **kwargs):
         """ Remove base with coverage below threshold and transform in Pandas Series
         """
@@ -172,7 +175,7 @@ class Alignment(object):
                 d[refid][strand] = pd.Series(s)
                 d[refid][strand].sort_index(inplace=True)
         return d
-    
+
     def _write_coverage_file (self, outfp, buf_size=8192, verbose=False, **kwargs):
         """Bufferized writer for the coverage bed file
         """
